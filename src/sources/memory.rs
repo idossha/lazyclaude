@@ -15,28 +15,33 @@ pub fn load(paths: &Paths) -> MemoryData {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().map(|e| e == "md").unwrap_or(false) {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    let filename = path
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string();
-                    let (fm, body) = parse_frontmatter(&content);
-                    files.push(MemoryFile {
-                        path: path.clone(),
-                        name: fm
-                            .get("name")
-                            .cloned()
-                            .unwrap_or_else(|| filename.trim_end_matches(".md").to_string()),
-                        description: fm.get("description").cloned().unwrap_or_default(),
-                        mem_type: fm
-                            .get("type")
-                            .cloned()
-                            .unwrap_or_else(|| "user".to_string()),
-                        body,
-                        filename,
-                    });
-                }
+                let content = match std::fs::read_to_string(&path) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        tracing::warn!("Failed to read memory file {}: {}", path.display(), e);
+                        continue;
+                    }
+                };
+                let filename = path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                let (fm, body) = parse_frontmatter(&content);
+                files.push(MemoryFile {
+                    path: path.clone(),
+                    name: fm
+                        .get("name")
+                        .cloned()
+                        .unwrap_or_else(|| filename.trim_end_matches(".md").to_string()),
+                    description: fm.get("description").cloned().unwrap_or_default(),
+                    mem_type: fm
+                        .get("type")
+                        .cloned()
+                        .unwrap_or_else(|| "user".to_string()),
+                    body,
+                    filename,
+                });
             }
         }
     }
@@ -48,4 +53,10 @@ pub fn load(paths: &Paths) -> MemoryData {
         project,
         dir: mem_dir,
     }
+}
+
+/// Delete a memory file by path.
+pub fn remove(path: &std::path::Path) -> anyhow::Result<()> {
+    std::fs::remove_file(path)?;
+    Ok(())
 }

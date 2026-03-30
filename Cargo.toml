@@ -19,6 +19,12 @@ dirs = "6"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 ureq = { version = "2", features = ["json"] }
+arboard = "3"
+fuzzy-matcher = "0.3"
+notify = "7"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
 
 [dev-dependencies]
 tempfile = "3"

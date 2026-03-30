@@ -1,5 +1,5 @@
 use crate::config::Paths;
-use crate::sources::{read_json, write_json, PermissionRule, Permissions, SettingsData, SettingsScopes};
+use crate::sources::{read_json, write_json, PermissionRule, Permissions, Scope, SettingsData, SettingsScopes};
 
 pub fn load(paths: &Paths) -> SettingsData {
     let user = read_json(&paths.settings_path("user"));
@@ -56,7 +56,7 @@ fn build_permissions(
     let mut allow = Vec::new();
     let mut deny = Vec::new();
 
-    let mut collect = |scope_name: &str, data: &serde_json::Value| {
+    let mut collect = |scope: Scope, data: &serde_json::Value| {
         if let Some(perms) = data.get("permissions").and_then(|v| v.as_object()) {
             if let Some(allow_arr) = perms.get("allow").and_then(|v| v.as_array()) {
                 for rule in allow_arr {
@@ -66,7 +66,7 @@ fn build_permissions(
                     };
                     allow.push(PermissionRule {
                         rule: rule_str,
-                        scope: scope_name.to_string(),
+                        scope,
                     });
                 }
             }
@@ -78,16 +78,16 @@ fn build_permissions(
                     };
                     deny.push(PermissionRule {
                         rule: rule_str,
-                        scope: scope_name.to_string(),
+                        scope,
                     });
                 }
             }
         }
     };
 
-    collect("user", user);
-    collect("project", project);
-    collect("local", local_);
+    collect(Scope::User, user);
+    collect(Scope::Project, project);
+    collect(Scope::Local, local_);
 
     Permissions { allow, deny }
 }

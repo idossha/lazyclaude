@@ -1,11 +1,11 @@
 use crate::config::Paths;
-use crate::sources::{read_json, Hook};
+use crate::sources::{read_json, Hook, Scope};
 
 pub fn load(paths: &Paths) -> Vec<Hook> {
     let mut results = Vec::new();
 
-    for scope in &["user", "project", "local"] {
-        let data = read_json(&paths.settings_path(scope));
+    for scope in &[Scope::User, Scope::Project, Scope::Local] {
+        let data = read_json(&paths.settings_path(scope.as_str()));
         if let Some(hooks) = data.get("hooks").and_then(|v| v.as_object()) {
             for (event, groups) in hooks {
                 if let Some(groups_arr) = groups.as_array() {
@@ -30,7 +30,7 @@ pub fn load(paths: &Paths) -> Vec<Hook> {
                                         .and_then(|v| v.as_str())
                                         .unwrap_or("command")
                                         .to_string(),
-                                    scope: scope.to_string(),
+                                    scope: *scope,
                                 });
                             }
                         }

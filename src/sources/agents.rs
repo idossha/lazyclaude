@@ -1,20 +1,25 @@
 use crate::config::Paths;
-use crate::sources::{parse_frontmatter, Agent};
+use crate::sources::{parse_frontmatter, Agent, Scope};
 
 pub fn load(paths: &Paths) -> Vec<Agent> {
     let mut agents = Vec::new();
 
-    scan_dir(&mut agents, &paths.user_agents_dir(), "user");
-    scan_dir(&mut agents, &paths.project_agents_dir(), "project");
+    scan_dir(&mut agents, &paths.user_agents_dir(), Scope::User);
+    scan_dir(&mut agents, &paths.project_agents_dir(), Scope::Project);
 
     agents.sort_by(|a, b| a.name.cmp(&b.name));
     agents
 }
 
-fn scan_dir(agents: &mut Vec<Agent>, dir: &std::path::Path, scope: &str) {
+fn scan_dir(agents: &mut Vec<Agent>, dir: &std::path::Path, scope: Scope) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
-        Err(_) => return,
+        Err(e) => {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                tracing::warn!("Failed to read agents dir {}: {}", dir.display(), e);
+            }
+            return;
+        }
     };
 
     for entry in entries.flatten() {
@@ -40,8 +45,16 @@ fn scan_dir(agents: &mut Vec<Agent>, dir: &std::path::Path, scope: &str) {
                 model: fm.get("model").cloned().unwrap_or_default(),
                 body,
                 dir_name,
-                scope: scope.to_string(),
+                scope,
             });
         }
     }
+}
+
+/// Delete an agent by removing its parent directory (e.g. agents/my-agent/).
+pub fn remove(agent_file: &std::path::Path) -> anyhow::Result<()> {
+    if let Some(dir) = agent_file.parent() {
+        std::fs::remove_dir_all(dir)?;
+    }
+    Ok(())
 }

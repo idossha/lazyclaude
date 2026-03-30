@@ -1,5 +1,5 @@
 use crate::config::Paths;
-use crate::sources::ClaudeMdFile;
+use crate::sources::{ClaudeMdFile, Scope};
 use std::path::PathBuf;
 
 pub fn load(paths: &Paths) -> Vec<ClaudeMdFile> {
@@ -9,7 +9,7 @@ pub fn load(paths: &Paths) -> Vec<ClaudeMdFile> {
     check_file(
         &mut files,
         paths.project_root.join("CLAUDE.md"),
-        "project",
+        Scope::Project,
         "claude_md",
     );
 
@@ -17,25 +17,25 @@ pub fn load(paths: &Paths) -> Vec<ClaudeMdFile> {
     check_file(
         &mut files,
         paths.project_root.join(".claude").join("CLAUDE.md"),
-        "project",
+        Scope::Project,
         "claude_md",
     );
 
     // Project-level .claude/rules/*.md
     let rules_dir = paths.project_root.join(".claude").join("rules");
-    scan_rules_dir(&mut files, &rules_dir, "project");
+    scan_rules_dir(&mut files, &rules_dir, Scope::Project);
 
     // User-level CLAUDE.md
-    check_file(&mut files, paths.home_dir.join("CLAUDE.md"), "user", "claude_md");
+    check_file(&mut files, paths.home_dir.join("CLAUDE.md"), Scope::User, "claude_md");
 
     // User-level rules (~/.claude/rules/*.md)
     let user_rules_dir = paths.claude_dir.join("rules");
-    scan_rules_dir(&mut files, &user_rules_dir, "user");
+    scan_rules_dir(&mut files, &user_rules_dir, Scope::User);
 
     files
 }
 
-fn scan_rules_dir(files: &mut Vec<ClaudeMdFile>, dir: &PathBuf, scope: &str) {
+fn scan_rules_dir(files: &mut Vec<ClaudeMdFile>, dir: &PathBuf, scope: Scope) {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -46,7 +46,7 @@ fn scan_rules_dir(files: &mut Vec<ClaudeMdFile>, dir: &PathBuf, scope: &str) {
     }
 }
 
-fn check_file(files: &mut Vec<ClaudeMdFile>, path: PathBuf, scope: &str, file_type: &str) {
+fn check_file(files: &mut Vec<ClaudeMdFile>, path: PathBuf, scope: Scope, file_type: &str) {
     if !path.exists() {
         return;
     }
@@ -61,7 +61,7 @@ fn check_file(files: &mut Vec<ClaudeMdFile>, path: PathBuf, scope: &str, file_ty
     files.push(ClaudeMdFile {
         path,
         name,
-        scope: scope.to_string(),
+        scope,
         file_type: file_type.to_string(),
         content,
         size,

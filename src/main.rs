@@ -4,12 +4,13 @@ mod ui;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
+use tracing_subscriber::EnvFilter;
 
 use lazyclaude::config::Paths;
 use lazyclaude::sources;
 
 #[derive(Parser)]
-#[command(name = "lazyclaude", about = "A lazygit-inspired TUI for managing Claude Code configuration")]
+#[command(name = "lazyclaude", version, about = "A lazygit-inspired TUI for managing Claude Code configuration")]
 struct Cli {
     /// Dump all configuration as JSON (for scripting / nvim integration)
     #[arg(long)]
@@ -39,6 +40,24 @@ enum Commands {
 }
 
 fn main() -> Result<()> {
+    // Initialize file-based logging before anything else.
+    // Logs go to ~/.claude/lazyclaude.log; control verbosity with LAZYCLAUDE_LOG env var.
+    let log_dir = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+        .join(".claude");
+    let file_appender = tracing_appender::rolling::never(&log_dir, "lazyclaude.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+    tracing_subscriber::fmt()
+        .with_writer(non_blocking)
+        .with_env_filter(
+            EnvFilter::try_from_env("LAZYCLAUDE_LOG")
+                .unwrap_or_else(|_| EnvFilter::new("warn")),
+        )
+        .with_ansi(false)
+        .init();
+
+    tracing::info!("lazyclaude starting");
+
     let cli = Cli::parse();
 
     let paths = build_paths(&cli);
@@ -55,9 +74,17 @@ fn main() -> Result<()> {
         return run_command(cmd, &paths);
     }
 
-    // Default: TUI
+    // Default: TUI — install a panic hook that restores the terminal first
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        ratatui::restore();
+        original_hook(panic_info);
+    }));
+
     let mut terminal = ratatui::init();
+    crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture).ok();
     let result = app::App::with_paths(paths).run(&mut terminal);
+    crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture).ok();
     ratatui::restore();
     result
 }
@@ -83,7 +110,10 @@ fn run_command(cmd: Commands, paths: &Paths) -> Result<()> {
                 "claude-md" => serde_json::to_string_pretty(&data.claude_md)?,
                 "keybindings" => serde_json::to_string_pretty(&data.keybindings)?,
                 "agents" => serde_json::to_string_pretty(&data.agents)?,
-                other => anyhow::bail!("unknown source: {other}. Options: memory, skills, mcp, settings, hooks, claude-md, keybindings, agents"),
+                "stats" => serde_json::to_string_pretty(&data.stats)?,
+                "plugins" => serde_json::to_string_pretty(&data.plugins)?,
+                "todos" => serde_json::to_string_pretty(&data.todos)?,
+                other => anyhow::bail!("unknown source: {other}. Options: memory, skills, mcp, settings, hooks, claude-md, keybindings, agents, stats, plugins, todos"),
             };
             println!("{json}");
         }

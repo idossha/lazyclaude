@@ -5,16 +5,55 @@ pub mod keybindings;
 pub mod mcp;
 pub mod mcp_registry;
 pub mod memory;
+pub mod plugin_registry;
+pub mod plugins;
 pub mod projects;
 pub mod sessions;
 pub mod settings;
 pub mod skills;
+pub mod skills_registry;
+pub mod stats;
+pub mod todos;
 
 pub use projects::Project;
 pub use sessions::Session;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+// ── Scope enum ──────────────────────────────────────────────────────────
+
+/// Compile-time–safe scope for configuration items.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Scope {
+    #[default]
+    User,
+    Project,
+    Local,
+}
+
+impl Scope {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Scope::User => "user",
+            Scope::Project => "project",
+            Scope::Local => "local",
+        }
+    }
+}
+
+impl std::fmt::Display for Scope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl PartialEq<&str> for Scope {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
 
 // ── Data types ──────────────────────────────────────────────────────────
 
@@ -29,6 +68,9 @@ pub struct SourceData {
     pub keybindings: Vec<Keybinding>,
     pub agents: Vec<Agent>,
     pub sessions: Vec<Session>,
+    pub stats: stats::StatsData,
+    pub plugins: plugins::PluginsData,
+    pub todos: Vec<todos::TodoItem>,
 }
 
 #[derive(Default, Clone, serde::Serialize)]
@@ -56,7 +98,7 @@ pub struct Skill {
     pub user_invocable: bool,
     pub body: String,
     pub dir_name: String,
-    pub scope: String,
+    pub scope: Scope,
 }
 
 #[derive(Default, Clone, serde::Serialize)]
@@ -67,7 +109,7 @@ pub struct Agent {
     pub model: String,
     pub body: String,
     pub dir_name: String,
-    pub scope: String,
+    pub scope: Scope,
 }
 
 #[derive(Default, Clone, serde::Serialize)]
@@ -83,6 +125,38 @@ pub struct McpServer {
     pub args: Vec<String>,
     pub env: HashMap<String, String>,
     pub disabled: bool,
+}
+
+impl McpServer {
+    pub fn preview_body(&self, scope: &str) -> String {
+        let mut lines = Vec::new();
+        lines.push(format!("# {}", self.name));
+        lines.push(String::new());
+        let status = if self.disabled { "Disabled" } else { "Enabled" };
+        lines.push(format!("Status: {status}"));
+        lines.push(format!("Scope: {scope}"));
+        lines.push(String::new());
+        lines.push("---".to_string());
+        lines.push(String::new());
+        lines.push(format!("Command: {}", self.command));
+        if !self.args.is_empty() {
+            lines.push(format!("Args: {}", self.args.join(" ")));
+        }
+        if !self.env.is_empty() {
+            lines.push(String::new());
+            lines.push("## Environment".to_string());
+            for (k, v) in &self.env {
+                let display = if v.chars().count() > 20 {
+                    let truncated: String = v.chars().take(17).collect();
+                    format!("{truncated}...")
+                } else {
+                    v.clone()
+                };
+                lines.push(format!("- {k}: {display}"));
+            }
+        }
+        lines.join("\n")
+    }
 }
 
 #[derive(Default, Clone, serde::Serialize)]
@@ -108,7 +182,7 @@ pub struct Permissions {
 #[derive(Default, Clone, serde::Serialize)]
 pub struct PermissionRule {
     pub rule: String,
-    pub scope: String,
+    pub scope: Scope,
 }
 
 #[derive(Default, Clone, serde::Serialize)]
@@ -117,14 +191,14 @@ pub struct Hook {
     pub matcher: String,
     pub command: String,
     pub hook_type: String,
-    pub scope: String,
+    pub scope: Scope,
 }
 
 #[derive(Default, Clone, serde::Serialize)]
 pub struct ClaudeMdFile {
     pub path: PathBuf,
     pub name: String,
-    pub scope: String,
+    pub scope: Scope,
     pub file_type: String,
     pub content: String,
     pub size: u64,
@@ -150,6 +224,9 @@ pub fn load_all(paths: &crate::config::Paths) -> SourceData {
         keybindings: keybindings::load(paths),
         agents: agents::load(paths),
         sessions: Vec::new(),
+        stats: stats::load(paths),
+        plugins: plugins::load(paths),
+        todos: todos::load(paths),
     }
 }
 
@@ -162,10 +239,20 @@ pub fn load_projects(paths: &crate::config::Paths) -> Vec<Project> {
 
 /// Read a JSON file, returning Value::Null on any failure.
 pub fn read_json(path: &PathBuf) -> serde_json::Value {
-    std::fs::read_to_string(path)
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or(serde_json::Value::Null)
+    match std::fs::read_to_string(path) {
+        Ok(s) => match serde_json::from_str(&s) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!("Failed to parse JSON {}: {}", path.display(), e);
+                serde_json::Value::Null
+            }
+        },
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+            tracing::warn!("Failed to read {}: {}", path.display(), e);
+            serde_json::Value::Null
+        }
+        Err(_) => serde_json::Value::Null, // File not found is expected, don't log
+    }
 }
 
 /// Write a JSON value to a file with pretty printing.

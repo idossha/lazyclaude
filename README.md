@@ -1,6 +1,6 @@
 # lazyclaude
 
-A lazygit-inspired TUI for managing Claude Code configuration. One place to view and edit memory, skills, MCP servers, permissions, hooks, instructions, keybindings, agents, and sessions — across user and project scopes.
+A lazygit-inspired TUI for managing Claude Code configuration. One place to view and edit memory, skills, MCP servers, permissions, hooks, instructions, keybindings, agents, sessions, stats, plugins, and todos — across user and project scopes.
 
 ## Install
 
@@ -31,6 +31,7 @@ cargo install --path .
 
 ```sh
 lazyclaude                    # launch TUI
+lazyclaude --version          # show version
 lazyclaude --json             # dump all config as JSON
 lazyclaude list mcp           # list a single source as JSON
 lazyclaude paths              # show resolved config paths
@@ -42,48 +43,78 @@ Override paths for custom setups:
 lazyclaude --claude-dir ~/.claude --project-dir /path/to/project
 ```
 
-Available sources for `list`: `memory`, `skills`, `mcp`, `settings`, `hooks`, `claude-md`, `keybindings`, `agents`.
+Available sources for `list`: `memory`, `skills`, `mcp`, `settings`, `hooks`, `claude-md`, `keybindings`, `agents`, `stats`, `plugins`, `todos`.
 
 ## Navigation
 
 | Key | Action |
 |-----|--------|
-| `1-8` | Switch panel directly |
+| `1-9, 0` | Switch panel directly |
 | `j/k` | Move up/down |
 | `J/K` | Scroll detail preview |
 | `Enter` | Select project / confirm action |
 | `l` | Focus detail pane |
 | `h/BS` | Back to panels |
 | `Tab` | Toggle panels/detail focus |
-| `/` | Filter items |
+| `/` | Filter items (fuzzy matching) |
 | `Esc` | Clear filter / back |
 | `?` | Help |
 | `R` | Refresh data |
 | `q` | Quit |
+
+Mouse support: click to select panels/items, scroll wheel to navigate.
 
 ### Panel actions
 
 | Key | Action |
 |-----|--------|
 | `e` | Edit in `$EDITOR` (Config/Memory/Skills/Agents) |
-| `a` | Add item (Settings/MCP) |
-| `d` | Delete item (Settings/MCP) |
+| `a` | Add / create item (Settings/MCP/Skills/Agents) |
+| `d` | Delete item |
+| `u` | Undo last delete |
 | `D` | Add deny permission (Settings) |
 | `t` | Toggle server (MCP) |
-| `s` | Search registry (MCP) |
+| `s` | Search registry (Skills/MCP/Plugins) |
+| `y` | Copy to clipboard |
+| `x` | Export panel data as JSON to clipboard |
+
+### Search overlay
+
+Press `s` on Skills, MCP, or Plugins to open a search overlay:
+
+- Type to fuzzy-filter the list
+- `Up/Down` to navigate results
+- `Enter` or `y` to install to user scope, `p` for project scope
+- `Tab` to preview details
+- `Esc` to close
+- Items already installed show a checkmark
+
+Skills are sourced from [anthropics/skills](https://github.com/anthropics/skills). MCP packages are sourced from npm.
 
 ## Panels
 
-| # | Panel | Scope | Read | Write |
-|---|-------|-------|------|-------|
-| 1 | Projects | -- | yes | Switch active project |
-| 2 | Config | User + Project | yes | Edit |
-| 3 | Memory | Project | yes | Edit |
-| 4 | Skills | User + Project | yes | -- |
-| 5 | Agents | User + Project | yes | -- |
-| 6 | MCP Servers | User + Project | yes | Add/Remove/Toggle/Search |
-| 7 | Settings | User/Project/Local | yes | Add/Delete |
-| 8 | Sessions | Project | yes | -- |
+| Key | Panel | Scope | Description |
+|-----|-------|-------|-------------|
+| `1` | Projects | -- | Switch active project context |
+| `2` | Config | User + Project | CLAUDE.md and rules (edit) |
+| `3` | Memory | Project | Memory files (edit/delete) |
+| `4` | Skills | User + Project | Skill definitions (create/search/install) |
+| `5` | Agents | User + Project | Agent definitions (create/edit) |
+| `6` | MCP | User + Project | Servers (add/remove/toggle/search) |
+| `7` | Settings | User/Project/Local | Permissions, hooks, keybindings (with diff view) |
+| `8` | Sessions | Project | Conversation history |
+| `9` | Stats | Global | Usage dashboard with charts |
+| `0` | Plugins | Global | Installed, blocked, marketplaces (search/install) |
+| -- | Todos | Global | Todo items from Claude sessions |
+
+## Features
+
+- **Auto-refresh**: Config files are watched for changes — the TUI updates automatically when you edit files in another terminal
+- **Fuzzy search**: The `/` filter and search overlay use fuzzy matching (type `mcpgit` to find `mcp-server-git`)
+- **Settings diff**: The Settings panel preview shows per-scope values (user/project/local) so you can see which scope defines each setting
+- **Undo**: Press `u` to undo the last delete operation (supports memory, skills, agents, MCP servers, and permissions)
+- **Clipboard**: `y` copies the current item, `x` exports the entire panel as JSON
+- **Logging**: Diagnostics are written to `~/.claude/lazyclaude.log` (set `LAZYCLAUDE_LOG=debug` for verbose output)
 
 ## Architecture
 

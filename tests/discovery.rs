@@ -8,6 +8,7 @@ use tempfile::TempDir;
 
 use lazyclaude::config::Paths;
 use lazyclaude::sources;
+use lazyclaude::sources::Scope;
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -64,14 +65,14 @@ fn test_skills_dual_scope() {
 
     assert_eq!(skills.len(), 2, "expected 2 skills, got {}", skills.len());
 
-    let user_skill = skills.iter().find(|s| s.scope == "user").expect("user skill");
+    let user_skill = skills.iter().find(|s| s.scope == Scope::User).expect("user skill");
     assert_eq!(user_skill.name, "My Skill");
     assert_eq!(user_skill.description, "A user skill");
     assert!(user_skill.user_invocable);
     assert_eq!(user_skill.dir_name, "my-skill");
     assert_eq!(user_skill.body, "Do things.");
 
-    let proj_skill = skills.iter().find(|s| s.scope == "project").expect("project skill");
+    let proj_skill = skills.iter().find(|s| s.scope == Scope::Project).expect("project skill");
     assert_eq!(proj_skill.name, "Proj Skill");
     assert_eq!(proj_skill.description, "A project skill");
     assert!(!proj_skill.user_invocable);
@@ -140,14 +141,14 @@ fn test_agents_dual_scope() {
 
     assert_eq!(agents.len(), 2, "expected 2 agents, got {}", agents.len());
 
-    let user_agent = agents.iter().find(|a| a.scope == "user").expect("user agent");
+    let user_agent = agents.iter().find(|a| a.scope == Scope::User).expect("user agent");
     assert_eq!(user_agent.name, "My Agent");
     assert_eq!(user_agent.description, "A user agent");
     assert_eq!(user_agent.model, "opus");
     assert_eq!(user_agent.dir_name, "my-agent");
     assert_eq!(user_agent.body, "Agent instructions.");
 
-    let proj_agent = agents.iter().find(|a| a.scope == "project").expect("project agent");
+    let proj_agent = agents.iter().find(|a| a.scope == Scope::Project).expect("project agent");
     assert_eq!(proj_agent.name, "Proj Agent");
     assert_eq!(proj_agent.description, "A project agent");
     assert_eq!(proj_agent.model, "sonnet");
@@ -288,7 +289,7 @@ fn test_settings_three_scopes() {
         .permissions
         .allow
         .iter()
-        .find(|r| r.scope == "user")
+        .find(|r| r.scope == Scope::User)
         .expect("user allow rule");
     assert_eq!(user_allow.rule, "Bash(echo *)");
 
@@ -296,7 +297,7 @@ fn test_settings_three_scopes() {
         .permissions
         .allow
         .iter()
-        .find(|r| r.scope == "local")
+        .find(|r| r.scope == Scope::Local)
         .expect("local allow rule");
     assert_eq!(local_allow.rule, "Read(*)");
 
@@ -307,7 +308,7 @@ fn test_settings_three_scopes() {
         "expected 1 deny rule, got {}",
         settings.permissions.deny.len()
     );
-    assert_eq!(settings.permissions.deny[0].scope, "project");
+    assert_eq!(settings.permissions.deny[0].scope, Scope::Project);
     assert_eq!(settings.permissions.deny[0].rule, "Bash(rm -rf *)");
 
     // Check that scopes are stored raw
@@ -410,13 +411,13 @@ fn test_hooks_three_scopes() {
 
     assert_eq!(hooks.len(), 2, "expected 2 hooks, got {}", hooks.len());
 
-    let user_hook = hooks.iter().find(|h| h.scope == "user").expect("user hook");
+    let user_hook = hooks.iter().find(|h| h.scope == Scope::User).expect("user hook");
     assert_eq!(user_hook.event, "PostToolUse");
     assert_eq!(user_hook.matcher, "Bash");
     assert_eq!(user_hook.command, "echo user-hook");
     assert_eq!(user_hook.hook_type, "command");
 
-    let proj_hook = hooks.iter().find(|h| h.scope == "project").expect("project hook");
+    let proj_hook = hooks.iter().find(|h| h.scope == Scope::Project).expect("project hook");
     assert_eq!(proj_hook.event, "PreToolUse");
     assert_eq!(proj_hook.matcher, "Edit");
     assert_eq!(proj_hook.command, "echo project-hook");
@@ -476,7 +477,7 @@ fn test_hooks_local_scope() {
 
     let hooks = sources::hooks::load(&paths);
     assert_eq!(hooks.len(), 1);
-    assert_eq!(hooks[0].scope, "local");
+    assert_eq!(hooks[0].scope, Scope::Local);
 }
 
 // ── CLAUDE.md ────────────────────────────────────────────────────────────
@@ -516,8 +517,8 @@ fn test_claude_md_all_locations() {
     assert_eq!(files.len(), 5, "expected 5 claude_md files, got {}", files.len());
 
     // Verify scopes
-    let project_files: Vec<_> = files.iter().filter(|f| f.scope == "project").collect();
-    let user_files: Vec<_> = files.iter().filter(|f| f.scope == "user").collect();
+    let project_files: Vec<_> = files.iter().filter(|f| f.scope == Scope::Project).collect();
+    let user_files: Vec<_> = files.iter().filter(|f| f.scope == Scope::User).collect();
     assert_eq!(project_files.len(), 3, "expected 3 project-scope files");
     assert_eq!(user_files.len(), 2, "expected 2 user-scope files");
 
@@ -547,7 +548,7 @@ fn test_claude_md_missing_files_still_works() {
 
     let files = sources::claude_md::load(&paths);
     assert_eq!(files.len(), 1);
-    assert_eq!(files[0].scope, "project");
+    assert_eq!(files[0].scope, Scope::Project);
     assert_eq!(files[0].file_type, "claude_md");
 }
 
@@ -1040,7 +1041,7 @@ fn test_settings_add_permission() {
     let settings = sources::settings::load(&paths);
     assert_eq!(settings.permissions.allow.len(), 1);
     assert_eq!(settings.permissions.allow[0].rule, "Bash(echo *)");
-    assert_eq!(settings.permissions.allow[0].scope, "user");
+    assert_eq!(settings.permissions.allow[0].scope, Scope::User);
 }
 
 #[test]
@@ -1239,4 +1240,1403 @@ fn test_agents_sorted_by_name() {
     assert_eq!(agents.len(), 2);
     assert_eq!(agents[0].name, "Alpha");
     assert_eq!(agents[1].name, "Zeta");
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — Plugins module
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_plugins_load_installed() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "plugins/installed_plugins.json",
+        r#"{
+            "plugins": {
+                "my-plugin": [
+                    {
+                        "version": "1.2.3",
+                        "scope": "user",
+                        "installedAt": "2025-01-15T12:00:00Z"
+                    }
+                ]
+            }
+        }"#,
+    );
+
+    let data = sources::plugins::load(&paths);
+    assert_eq!(data.installed.len(), 1);
+    assert_eq!(data.installed[0].name, "my-plugin");
+    assert_eq!(data.installed[0].version, "1.2.3");
+    assert_eq!(data.installed[0].scope, Scope::User);
+    // installedAt is truncated to first 10 chars
+    assert_eq!(data.installed[0].installed_at, "2025-01-15");
+}
+
+#[test]
+fn test_plugins_load_multiple_installations() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "plugins/installed_plugins.json",
+        r#"{
+            "plugins": {
+                "multi-plugin": [
+                    {"version": "1.0.0", "scope": "user", "installedAt": "2025-01-10"},
+                    {"version": "2.0.0", "scope": "project", "installedAt": "2025-02-20"}
+                ]
+            }
+        }"#,
+    );
+
+    let data = sources::plugins::load(&paths);
+    assert_eq!(data.installed.len(), 2);
+    assert_eq!(data.installed[0].version, "1.0.0");
+    assert_eq!(data.installed[1].version, "2.0.0");
+}
+
+#[test]
+fn test_plugins_load_blocked() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "plugins/blocklist.json",
+        r#"{
+            "plugins": [
+                {"plugin": "bad-plugin", "reason": "security", "text": "Known vulnerability"}
+            ]
+        }"#,
+    );
+
+    let data = sources::plugins::load(&paths);
+    assert_eq!(data.blocked.len(), 1);
+    assert_eq!(data.blocked[0].name, "bad-plugin");
+    assert_eq!(data.blocked[0].reason, "security");
+    assert_eq!(data.blocked[0].text, "Known vulnerability");
+}
+
+#[test]
+fn test_plugins_load_marketplaces() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "plugins/known_marketplaces.json",
+        r#"{
+            "official": {
+                "source": {
+                    "source": "github",
+                    "repo": "anthropics/claude-plugins"
+                }
+            }
+        }"#,
+    );
+
+    let data = sources::plugins::load(&paths);
+    assert_eq!(data.marketplaces.len(), 1);
+    assert_eq!(data.marketplaces[0].name, "official");
+    assert_eq!(data.marketplaces[0].source_type, "github");
+    assert_eq!(data.marketplaces[0].repo, "anthropics/claude-plugins");
+}
+
+#[test]
+fn test_plugins_load_empty_returns_defaults() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    // No plugin files at all
+    let data = sources::plugins::load(&paths);
+    assert!(data.installed.is_empty());
+    assert!(data.blocked.is_empty());
+    assert!(data.marketplaces.is_empty());
+}
+
+#[test]
+fn test_plugins_install_and_remove() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    // Install a plugin
+    sources::plugins::install(&paths, "new-plugin", "1.0.0", "test-marketplace")
+        .expect("install plugin");
+
+    let data = sources::plugins::load(&paths);
+    assert_eq!(data.installed.len(), 1);
+    assert_eq!(data.installed[0].name, "new-plugin");
+    assert_eq!(data.installed[0].version, "1.0.0");
+    assert_eq!(data.installed[0].scope, Scope::User);
+
+    // Remove the plugin
+    sources::plugins::remove(&paths, "new-plugin").expect("remove plugin");
+    let data = sources::plugins::load(&paths);
+    assert!(data.installed.is_empty());
+}
+
+#[test]
+fn test_plugins_install_replaces_existing_user_scope() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    // Install v1
+    sources::plugins::install(&paths, "my-plugin", "1.0.0", "mp1")
+        .expect("install v1");
+
+    // Install v2 — should replace, not duplicate
+    sources::plugins::install(&paths, "my-plugin", "2.0.0", "mp1")
+        .expect("install v2");
+
+    let data = sources::plugins::load(&paths);
+    assert_eq!(data.installed.len(), 1, "should have exactly 1 installation after replacement");
+    assert_eq!(data.installed[0].version, "2.0.0");
+}
+
+#[test]
+fn test_plugins_install_into_empty_file() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    // No pre-existing installed_plugins.json
+    sources::plugins::install(&paths, "fresh-plugin", "0.1.0", "market")
+        .expect("install into empty");
+
+    let data = sources::plugins::load(&paths);
+    assert_eq!(data.installed.len(), 1);
+    assert_eq!(data.installed[0].name, "fresh-plugin");
+}
+
+#[test]
+fn test_plugins_unblock() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "plugins/blocklist.json",
+        r#"{"plugins": [
+            {"plugin": "keep-me", "reason": "ok", "text": ""},
+            {"plugin": "unblock-me", "reason": "test", "text": ""}
+        ]}"#,
+    );
+
+    sources::plugins::unblock(&paths, "unblock-me").expect("unblock");
+
+    let data = sources::plugins::load(&paths);
+    assert_eq!(data.blocked.len(), 1);
+    assert_eq!(data.blocked[0].name, "keep-me");
+}
+
+// ── Plugins preview bodies ──────────────────────────────────────────────
+
+#[test]
+fn test_installed_plugin_preview_body() {
+    let plugin = sources::plugins::InstalledPlugin {
+        name: "test-plugin".to_string(),
+        version: "1.0.0".to_string(),
+        scope: sources::Scope::User,
+        installed_at: "2025-03-01".to_string(),
+    };
+
+    let body = plugin.preview_body();
+    assert!(body.contains("# test-plugin"));
+    assert!(body.contains("Version: 1.0.0"));
+    assert!(body.contains("Scope: user"));
+    assert!(body.contains("Installed: 2025-03-01"));
+}
+
+#[test]
+fn test_installed_plugin_preview_body_empty_fields() {
+    let plugin = sources::plugins::InstalledPlugin {
+        name: "minimal".to_string(),
+        version: String::new(),
+        scope: sources::Scope::User,
+        installed_at: String::new(),
+    };
+
+    let body = plugin.preview_body();
+    assert!(body.contains("# minimal"));
+    assert!(body.contains("Scope: user"));
+    // Empty version and installed_at should be omitted
+    assert!(!body.contains("Version:"));
+    assert!(!body.contains("Installed:"));
+}
+
+#[test]
+fn test_blocked_plugin_preview_body() {
+    let plugin = sources::plugins::BlockedPlugin {
+        name: "bad-plugin".to_string(),
+        reason: "security".to_string(),
+        text: "CVE-2025-1234".to_string(),
+    };
+
+    let body = plugin.preview_body();
+    assert!(body.contains("# bad-plugin"));
+    assert!(body.contains("Status: Blocked"));
+    assert!(body.contains("Reason: security"));
+    assert!(body.contains("CVE-2025-1234"));
+}
+
+#[test]
+fn test_blocked_plugin_preview_body_empty_reason() {
+    let plugin = sources::plugins::BlockedPlugin {
+        name: "blocked".to_string(),
+        reason: String::new(),
+        text: String::new(),
+    };
+
+    let body = plugin.preview_body();
+    assert!(body.contains("# blocked"));
+    assert!(body.contains("Status: Blocked"));
+    assert!(!body.contains("Reason:"));
+}
+
+#[test]
+fn test_marketplace_preview_body() {
+    let mp = sources::plugins::Marketplace {
+        name: "official".to_string(),
+        source_type: "github".to_string(),
+        repo: "anthropics/plugins".to_string(),
+    };
+
+    let body = mp.preview_body();
+    assert!(body.contains("# official"));
+    assert!(body.contains("Source: github"));
+    assert!(body.contains("Repository: anthropics/plugins"));
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — Plugin Registry (local marketplace search)
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_plugin_registry_search_local_empty_dir() {
+    let tmp = TempDir::new().unwrap();
+    let result = sources::plugin_registry::search_local(tmp.path(), "");
+    assert!(result.is_ok());
+    assert!(result.unwrap().is_empty());
+}
+
+#[test]
+fn test_plugin_registry_search_local_no_marketplaces_dir() {
+    let tmp = TempDir::new().unwrap();
+    // plugins dir exists but no marketplaces subdir
+    let result = sources::plugin_registry::search_local(tmp.path(), "");
+    assert!(result.is_ok());
+    assert!(result.unwrap().is_empty());
+}
+
+#[test]
+fn test_plugin_registry_search_local_finds_plugin() {
+    let tmp = TempDir::new().unwrap();
+    let base = tmp.path();
+
+    // Create marketplace/plugin structure
+    let plugin_dir = base.join("marketplaces/test-mp/plugins/my-plugin");
+    let claude_plugin_dir = plugin_dir.join(".claude-plugin");
+    fs::create_dir_all(&claude_plugin_dir).unwrap();
+    fs::write(
+        claude_plugin_dir.join("plugin.json"),
+        r#"{"name": "my-plugin", "description": "A test plugin", "version": "1.0.0", "author": {"name": "Test Author"}}"#,
+    ).unwrap();
+
+    let results = sources::plugin_registry::search_local(base, "").unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].name, "my-plugin");
+    assert_eq!(results[0].description, "A test plugin");
+    assert_eq!(results[0].version, "1.0.0");
+    assert_eq!(results[0].author, "Test Author");
+    assert_eq!(results[0].marketplace, "test-mp");
+}
+
+#[test]
+fn test_plugin_registry_search_local_filters_by_query() {
+    let tmp = TempDir::new().unwrap();
+    let base = tmp.path();
+
+    // Plugin 1
+    let p1 = base.join("marketplaces/mp/plugins/alpha-plugin/.claude-plugin");
+    fs::create_dir_all(&p1).unwrap();
+    fs::write(p1.join("plugin.json"), r#"{"name": "alpha-plugin", "description": "First"}"#).unwrap();
+
+    // Plugin 2
+    let p2 = base.join("marketplaces/mp/plugins/beta-tool/.claude-plugin");
+    fs::create_dir_all(&p2).unwrap();
+    fs::write(p2.join("plugin.json"), r#"{"name": "beta-tool", "description": "Second"}"#).unwrap();
+
+    // Search for "alpha"
+    let results = sources::plugin_registry::search_local(base, "alpha").unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].name, "alpha-plugin");
+
+    // Search for "second" (matches description)
+    let results = sources::plugin_registry::search_local(base, "second").unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].name, "beta-tool");
+
+    // Empty query returns all
+    let results = sources::plugin_registry::search_local(base, "").unwrap();
+    assert_eq!(results.len(), 2);
+}
+
+#[test]
+fn test_plugin_registry_component_detection() {
+    let tmp = TempDir::new().unwrap();
+    let base = tmp.path();
+
+    let plugin_dir = base.join("marketplaces/mp/plugins/full-plugin");
+    let claude_plugin_dir = plugin_dir.join(".claude-plugin");
+    fs::create_dir_all(&claude_plugin_dir).unwrap();
+    fs::write(
+        claude_plugin_dir.join("plugin.json"),
+        r#"{"name": "full-plugin", "description": "Has everything"}"#,
+    ).unwrap();
+
+    // Create component subdirectories
+    fs::create_dir_all(plugin_dir.join("agents")).unwrap();
+    fs::create_dir_all(plugin_dir.join("skills")).unwrap();
+    fs::create_dir_all(plugin_dir.join("hooks")).unwrap();
+    fs::create_dir_all(plugin_dir.join("commands")).unwrap();
+    fs::create_dir_all(plugin_dir.join("mcp")).unwrap();
+
+    let results = sources::plugin_registry::search_local(base, "").unwrap();
+    assert_eq!(results.len(), 1);
+    assert!(results[0].has_agents);
+    assert!(results[0].has_skills);
+    assert!(results[0].has_hooks);
+    assert!(results[0].has_commands);
+    assert!(results[0].has_mcp);
+}
+
+#[test]
+fn test_plugin_registry_mcp_servers_dir() {
+    let tmp = TempDir::new().unwrap();
+    let base = tmp.path();
+
+    let plugin_dir = base.join("marketplaces/mp/plugins/mcp-plugin");
+    let claude_plugin_dir = plugin_dir.join(".claude-plugin");
+    fs::create_dir_all(&claude_plugin_dir).unwrap();
+    fs::write(
+        claude_plugin_dir.join("plugin.json"),
+        r#"{"name": "mcp-plugin", "description": "MCP via mcp-servers dir"}"#,
+    ).unwrap();
+
+    // "mcp-servers" dir also triggers has_mcp
+    fs::create_dir_all(plugin_dir.join("mcp-servers")).unwrap();
+
+    let results = sources::plugin_registry::search_local(base, "").unwrap();
+    assert!(results[0].has_mcp);
+}
+
+#[test]
+fn test_plugin_registry_component_tags() {
+    let entry = sources::plugin_registry::PluginEntry {
+        name: "test".to_string(),
+        description: String::new(),
+        version: String::new(),
+        author: String::new(),
+        marketplace: String::new(),
+        readme: String::new(),
+        has_agents: true,
+        has_skills: false,
+        has_hooks: true,
+        has_commands: false,
+        has_mcp: true,
+    };
+
+    let tags = entry.component_tags();
+    assert_eq!(tags, vec!["Agents", "Hooks", "MCP Servers"]);
+}
+
+#[test]
+fn test_plugin_registry_component_summary() {
+    let entry = sources::plugin_registry::PluginEntry {
+        name: "test".to_string(),
+        description: String::new(),
+        version: String::new(),
+        author: String::new(),
+        marketplace: String::new(),
+        readme: String::new(),
+        has_agents: true,
+        has_skills: true,
+        has_hooks: false,
+        has_commands: false,
+        has_mcp: false,
+    };
+
+    assert_eq!(entry.component_summary(), "agents skills");
+}
+
+#[test]
+fn test_plugin_registry_component_summary_empty() {
+    let entry = sources::plugin_registry::PluginEntry {
+        name: "bare".to_string(),
+        description: String::new(),
+        version: String::new(),
+        author: String::new(),
+        marketplace: String::new(),
+        readme: String::new(),
+        has_agents: false,
+        has_skills: false,
+        has_hooks: false,
+        has_commands: false,
+        has_mcp: false,
+    };
+
+    assert_eq!(entry.component_summary(), "");
+    assert!(entry.component_tags().is_empty());
+}
+
+#[test]
+fn test_plugin_registry_preview_body() {
+    let entry = sources::plugin_registry::PluginEntry {
+        name: "cool-plugin".to_string(),
+        description: "A cool plugin".to_string(),
+        version: "2.0.0".to_string(),
+        author: "Dev".to_string(),
+        marketplace: "official".to_string(),
+        readme: "# README\nThis is a plugin.".to_string(),
+        has_agents: true,
+        has_skills: false,
+        has_hooks: false,
+        has_commands: false,
+        has_mcp: false,
+    };
+
+    let body = entry.preview_body();
+    assert!(body.contains("# cool-plugin"));
+    assert!(body.contains("A cool plugin"));
+    assert!(body.contains("Version: 2.0.0"));
+    assert!(body.contains("Author: Dev"));
+    assert!(body.contains("Marketplace: official"));
+    assert!(body.contains("## Components"));
+    assert!(body.contains("- Agents"));
+    assert!(body.contains("## Install"));
+    assert!(body.contains("cool-plugin@official"));
+    assert!(body.contains("# README"));
+}
+
+#[test]
+fn test_plugin_registry_results_sorted_by_name() {
+    let tmp = TempDir::new().unwrap();
+    let base = tmp.path();
+
+    for name in &["zebra-plugin", "alpha-plugin", "mid-plugin"] {
+        let p = base.join(format!("marketplaces/mp/plugins/{name}/.claude-plugin"));
+        fs::create_dir_all(&p).unwrap();
+        fs::write(
+            p.join("plugin.json"),
+            format!(r#"{{"name": "{name}", "description": ""}}"#),
+        ).unwrap();
+    }
+
+    let results = sources::plugin_registry::search_local(base, "").unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0].name, "alpha-plugin");
+    assert_eq!(results[1].name, "mid-plugin");
+    assert_eq!(results[2].name, "zebra-plugin");
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — Stats module
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_stats_load_full() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "stats-cache.json",
+        r#"{
+            "totalSessions": 42,
+            "totalMessages": 1234,
+            "firstSessionDate": "2025-01-01T00:00:00Z",
+            "lastComputedDate": "2025-06-15",
+            "dailyActivity": [
+                {"date": "2025-06-15", "messageCount": 10, "sessionCount": 2, "toolCallCount": 5}
+            ],
+            "modelUsage": {
+                "opus": {"inputTokens": 1000, "outputTokens": 2000, "cacheReadInputTokens": 500, "cacheCreationInputTokens": 100},
+                "sonnet": {"inputTokens": 500, "outputTokens": 800, "cacheReadInputTokens": 0, "cacheCreationInputTokens": 0}
+            },
+            "longestSession": {
+                "sessionId": "abc123",
+                "duration": 3600000,
+                "messageCount": 50
+            },
+            "hourCounts": {"0": 5, "12": 20, "23": 3}
+        }"#,
+    );
+
+    let stats = sources::stats::load(&paths);
+    assert_eq!(stats.total_sessions, 42);
+    assert_eq!(stats.total_messages, 1234);
+    assert_eq!(stats.first_session_date, "2025-01-01");
+    assert_eq!(stats.last_computed_date, "2025-06-15");
+
+    // Daily activity
+    assert_eq!(stats.daily_activity.len(), 1);
+    assert_eq!(stats.daily_activity[0].date, "2025-06-15");
+    assert_eq!(stats.daily_activity[0].messages, 10);
+    assert_eq!(stats.daily_activity[0].sessions, 2);
+    assert_eq!(stats.daily_activity[0].tool_calls, 5);
+
+    // Model usage (sorted by total_tokens descending)
+    assert_eq!(stats.model_usage.len(), 2);
+    assert_eq!(stats.model_usage[0].model, "opus");
+    assert_eq!(stats.model_usage[0].total_tokens, 1000 + 2000 + 500 + 100);
+    assert_eq!(stats.model_usage[1].model, "sonnet");
+    assert_eq!(stats.model_usage[1].total_tokens, 500 + 800);
+
+    // Longest session
+    let ls = stats.longest_session.as_ref().unwrap();
+    assert_eq!(ls.session_id, "abc123");
+    assert_eq!(ls.duration_ms, 3600000);
+    assert_eq!(ls.message_count, 50);
+
+    // Hour counts
+    assert_eq!(stats.hour_counts[0], 5);
+    assert_eq!(stats.hour_counts[12], 20);
+    assert_eq!(stats.hour_counts[23], 3);
+    assert_eq!(stats.hour_counts[1], 0); // unset hour
+}
+
+#[test]
+fn test_stats_load_empty_file() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    // No stats-cache.json
+    let stats = sources::stats::load(&paths);
+    assert_eq!(stats.total_sessions, 0);
+    assert_eq!(stats.total_messages, 0);
+    assert!(stats.first_session_date.is_empty());
+    assert!(stats.daily_activity.is_empty());
+    assert!(stats.model_usage.is_empty());
+    assert!(stats.longest_session.is_none());
+    assert_eq!(stats.hour_counts, [0u64; 24]);
+}
+
+#[test]
+fn test_stats_load_invalid_json() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(claude_dir.path(), "stats-cache.json", "not json at all");
+    let stats = sources::stats::load(&paths);
+    assert_eq!(stats.total_sessions, 0);
+}
+
+#[test]
+fn test_stats_hour_counts_ignores_invalid_keys() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "stats-cache.json",
+        r#"{"hourCounts": {"0": 10, "24": 999, "abc": 5, "23": 7}}"#,
+    );
+
+    let stats = sources::stats::load(&paths);
+    assert_eq!(stats.hour_counts[0], 10);
+    assert_eq!(stats.hour_counts[23], 7);
+    // Key "24" is out of bounds (h < 24 check), should be ignored
+    // Key "abc" can't be parsed, should be ignored
+}
+
+#[test]
+fn test_stats_first_session_date_short_string() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "stats-cache.json",
+        r#"{"firstSessionDate": "short"}"#,
+    );
+
+    let stats = sources::stats::load(&paths);
+    // If string is shorter than 10 chars, use as-is
+    assert_eq!(stats.first_session_date, "short");
+}
+
+#[test]
+fn test_stats_no_longest_session() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "stats-cache.json",
+        r#"{"totalSessions": 5}"#,
+    );
+
+    let stats = sources::stats::load(&paths);
+    assert_eq!(stats.total_sessions, 5);
+    assert!(stats.longest_session.is_none());
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — Todos module
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_todos_load_basic() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "todos/session1.json",
+        r#"[
+            {"id": "t1", "content": "Fix the bug", "status": "pending"},
+            {"id": "t2", "content": "Write tests", "status": "done"}
+        ]"#,
+    );
+
+    let todos = sources::todos::load(&paths);
+    assert_eq!(todos.len(), 2);
+    assert_eq!(todos[0].id, "t1");
+    assert_eq!(todos[0].content, "Fix the bug");
+    assert_eq!(todos[0].status, "pending");
+    assert_eq!(todos[0].session_file, "session1");
+    assert_eq!(todos[1].status, "done");
+}
+
+#[test]
+fn test_todos_load_empty_dir() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    // No todos directory
+    let todos = sources::todos::load(&paths);
+    assert!(todos.is_empty());
+}
+
+#[test]
+fn test_todos_fallback_content_fields() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    // Test that "subject", "description", and "text" fallback fields work
+    write_fixture(
+        claude_dir.path(),
+        "todos/session-fallback.json",
+        r#"[
+            {"id": "a", "subject": "Subject text"},
+            {"id": "b", "description": "Description text"},
+            {"id": "c", "text": "Text text"}
+        ]"#,
+    );
+
+    let todos = sources::todos::load(&paths);
+    assert_eq!(todos.len(), 3);
+    assert_eq!(todos[0].content, "Subject text");
+    assert_eq!(todos[1].content, "Description text");
+    assert_eq!(todos[2].content, "Text text");
+}
+
+#[test]
+fn test_todos_default_status_is_pending() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "todos/session.json",
+        r#"[{"id": "x", "content": "No status field"}]"#,
+    );
+
+    let todos = sources::todos::load(&paths);
+    assert_eq!(todos.len(), 1);
+    assert_eq!(todos[0].status, "pending");
+}
+
+#[test]
+fn test_todos_auto_id_when_missing() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "todos/session.json",
+        r#"[{"content": "No id"}, {"content": "Also no id"}]"#,
+    );
+
+    let todos = sources::todos::load(&paths);
+    assert_eq!(todos.len(), 2);
+    // Auto-generated IDs should be numeric strings based on position
+    assert_eq!(todos[0].id, "0");
+    assert_eq!(todos[1].id, "1");
+}
+
+#[test]
+fn test_todos_skips_empty_entries() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    // Entry with no id and no content/text fields => both empty => skipped
+    write_fixture(
+        claude_dir.path(),
+        "todos/session.json",
+        r#"[{"status": "pending"}, {"id": "valid", "content": "Real todo"}]"#,
+    );
+
+    let todos = sources::todos::load(&paths);
+    assert_eq!(todos.len(), 1);
+    assert_eq!(todos[0].id, "valid");
+}
+
+#[test]
+fn test_todos_ignores_non_json_files() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    let todo_dir = claude_dir.path().join("todos");
+    fs::create_dir_all(&todo_dir).unwrap();
+    fs::write(todo_dir.join("notes.txt"), "not json").unwrap();
+    fs::write(todo_dir.join("valid.json"), r#"[{"id": "1", "content": "ok"}]"#).unwrap();
+
+    let todos = sources::todos::load(&paths);
+    assert_eq!(todos.len(), 1);
+    assert_eq!(todos[0].content, "ok");
+}
+
+#[test]
+fn test_todos_invalid_json_file_skipped() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    let todo_dir = claude_dir.path().join("todos");
+    fs::create_dir_all(&todo_dir).unwrap();
+    fs::write(todo_dir.join("bad.json"), "not valid json!!!").unwrap();
+    fs::write(todo_dir.join("good.json"), r#"[{"id": "1", "content": "ok"}]"#).unwrap();
+
+    let todos = sources::todos::load(&paths);
+    assert_eq!(todos.len(), 1);
+}
+
+#[test]
+fn test_todos_multiple_session_files() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    let todo_dir = claude_dir.path().join("todos");
+    fs::create_dir_all(&todo_dir).unwrap();
+    fs::write(todo_dir.join("session-a.json"), r#"[{"id": "1", "content": "from A"}]"#).unwrap();
+    fs::write(todo_dir.join("session-b.json"), r#"[{"id": "2", "content": "from B"}]"#).unwrap();
+
+    let todos = sources::todos::load(&paths);
+    assert_eq!(todos.len(), 2);
+
+    // Each todo should reference its session file
+    let session_files: Vec<&str> = todos.iter().map(|t| t.session_file.as_str()).collect();
+    assert!(session_files.contains(&"session-a"));
+    assert!(session_files.contains(&"session-b"));
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — MCP Registry (RegistryEntry methods, no network)
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_mcp_registry_popularity_dots() {
+    let make_entry = |pop: f64| sources::mcp_registry::RegistryEntry {
+        name: String::new(),
+        description: String::new(),
+        version: String::new(),
+        install_command: String::new(),
+        install_args: Vec::new(),
+        registry: String::new(),
+        author: String::new(),
+        date: String::new(),
+        homepage: String::new(),
+        repository: String::new(),
+        npm_url: String::new(),
+        keywords: Vec::new(),
+        score_quality: 0.0,
+        score_popularity: pop,
+        score_maintenance: 0.0,
+    };
+
+    assert_eq!(make_entry(0.0).popularity_dots(), "\u{25CB}\u{25CB}\u{25CB}\u{25CB}\u{25CB}");
+    assert_eq!(make_entry(0.15).popularity_dots(), "\u{25CF}\u{25CB}\u{25CB}\u{25CB}\u{25CB}");
+    assert_eq!(make_entry(0.5).popularity_dots(), "\u{25CF}\u{25CF}\u{25CF}\u{25CB}\u{25CB}");
+    assert_eq!(make_entry(1.0).popularity_dots(), "\u{25CF}\u{25CF}\u{25CF}\u{25CF}\u{25CF}");
+}
+
+#[test]
+fn test_mcp_registry_preview_body_content() {
+    let entry = sources::mcp_registry::RegistryEntry {
+        name: "mcp-server-test".to_string(),
+        description: "A test MCP server".to_string(),
+        version: "3.0.0".to_string(),
+        install_command: "npx".to_string(),
+        install_args: vec!["-y".to_string(), "mcp-server-test".to_string()],
+        registry: "npm".to_string(),
+        author: "TestDev".to_string(),
+        date: "2025-06-15T12:00:00".to_string(),
+        homepage: "https://example.com".to_string(),
+        repository: "https://github.com/test/repo".to_string(),
+        npm_url: "https://npmjs.com/package/mcp-server-test".to_string(),
+        keywords: vec!["mcp".to_string(), "test".to_string()],
+        score_quality: 0.8,
+        score_popularity: 0.5,
+        score_maintenance: 0.9,
+    };
+
+    let body = entry.preview_body();
+    assert!(body.contains("# mcp-server-test"));
+    assert!(body.contains("A test MCP server"));
+    assert!(body.contains("Version: 3.0.0"));
+    assert!(body.contains("Author: TestDev"));
+    assert!(body.contains("Published: 2025-06-15"));
+    assert!(body.contains("Registry: npm"));
+    assert!(body.contains("## Quality"));
+    assert!(body.contains("## Popularity"));
+    assert!(body.contains("## Maintenance"));
+    assert!(body.contains("npm: https://npmjs.com/package/mcp-server-test"));
+    assert!(body.contains("Homepage: https://example.com"));
+    assert!(body.contains("Repository: https://github.com/test/repo"));
+    assert!(body.contains("Keywords: mcp, test"));
+    assert!(body.contains("## Install"));
+    assert!(body.contains("npx -y mcp-server-test"));
+}
+
+#[test]
+fn test_mcp_registry_preview_body_minimal() {
+    let entry = sources::mcp_registry::RegistryEntry {
+        name: "minimal".to_string(),
+        description: String::new(),
+        version: "1.0.0".to_string(),
+        install_command: "npx".to_string(),
+        install_args: vec!["-y".to_string(), "minimal".to_string()],
+        registry: "npm".to_string(),
+        author: String::new(),
+        date: String::new(),
+        homepage: String::new(),
+        repository: String::new(),
+        npm_url: String::new(),
+        keywords: Vec::new(),
+        score_quality: 0.0,
+        score_popularity: 0.0,
+        score_maintenance: 0.0,
+    };
+
+    let body = entry.preview_body();
+    assert!(body.contains("# minimal"));
+    // No author, date, links, or keywords sections
+    assert!(!body.contains("Author:"));
+    assert!(!body.contains("Published:"));
+    assert!(!body.contains("npm:"));
+    assert!(!body.contains("Keywords:"));
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — Skills Registry (SkillEntry methods, no network)
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_skills_registry_preview_body_not_installed() {
+    let entry = sources::skills_registry::SkillEntry {
+        name: "code-review".to_string(),
+        description: "Automated code review\nwith AI feedback".to_string(),
+        dir_name: "code-review".to_string(),
+    };
+
+    let body = entry.preview_body(false);
+    assert!(body.contains("# code-review"));
+    assert!(body.contains("Automated code review"));
+    assert!(body.contains("with AI feedback"));
+    assert!(body.contains("Source: github.com/anthropics/skills"));
+    assert!(body.contains("Directory: skills/code-review"));
+    assert!(body.contains("## Install"));
+    assert!(body.contains("~/.claude/skills/code-review/"));
+    assert!(!body.contains("Already installed"));
+}
+
+#[test]
+fn test_skills_registry_preview_body_installed() {
+    let entry = sources::skills_registry::SkillEntry {
+        name: "my-skill".to_string(),
+        description: "A skill".to_string(),
+        dir_name: "my-skill".to_string(),
+    };
+
+    let body = entry.preview_body(true);
+    assert!(body.contains("Status: Already installed"));
+}
+
+#[test]
+fn test_skills_registry_preview_body_empty_description() {
+    let entry = sources::skills_registry::SkillEntry {
+        name: "no-desc".to_string(),
+        description: String::new(),
+        dir_name: "no-desc".to_string(),
+    };
+
+    let body = entry.preview_body(false);
+    assert!(body.contains("# no-desc"));
+    assert!(body.contains("---"));
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — McpServer preview_body
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_mcp_server_preview_body_basic() {
+    let server = sources::McpServer {
+        name: "my-server".to_string(),
+        command: "node".to_string(),
+        args: vec!["index.js".to_string(), "--port".to_string(), "3000".to_string()],
+        env: std::collections::HashMap::new(),
+        disabled: false,
+    };
+
+    let body = server.preview_body("user");
+    assert!(body.contains("# my-server"));
+    assert!(body.contains("Status: Enabled"));
+    assert!(body.contains("Scope: user"));
+    assert!(body.contains("Command: node"));
+    assert!(body.contains("Args: index.js --port 3000"));
+}
+
+#[test]
+fn test_mcp_server_preview_body_disabled() {
+    let server = sources::McpServer {
+        name: "off-server".to_string(),
+        command: "python".to_string(),
+        args: Vec::new(),
+        env: std::collections::HashMap::new(),
+        disabled: true,
+    };
+
+    let body = server.preview_body("project");
+    assert!(body.contains("Status: Disabled"));
+    assert!(body.contains("Scope: project"));
+    // No "Args:" line when args is empty
+    assert!(!body.contains("Args:"));
+}
+
+#[test]
+fn test_mcp_server_preview_body_truncates_long_env_values() {
+    let mut env = std::collections::HashMap::new();
+    env.insert("SHORT".to_string(), "abc".to_string());
+    env.insert("LONG_KEY".to_string(), "this_is_a_very_long_value_that_exceeds_20_chars".to_string());
+
+    let server = sources::McpServer {
+        name: "env-server".to_string(),
+        command: "node".to_string(),
+        args: Vec::new(),
+        env,
+        disabled: false,
+    };
+
+    let body = server.preview_body("user");
+    assert!(body.contains("## Environment"));
+    assert!(body.contains("SHORT: abc"));
+    // Long value should be truncated to 17 chars + "..."
+    assert!(body.contains("LONG_KEY: this_is_a_very_lo..."));
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — Frontmatter edge cases
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_parse_frontmatter_colon_in_value() {
+    // Values with colons (e.g. URLs) should preserve everything after first colon
+    let content = "---\nurl: https://example.com:8080\n---\nBody.";
+    let (fm, body) = sources::parse_frontmatter(content);
+    assert_eq!(fm.get("url").map(|s| s.as_str()), Some("https://example.com:8080"));
+    assert_eq!(body, "Body.");
+}
+
+#[test]
+fn test_parse_frontmatter_empty_string() {
+    let (fm, body) = sources::parse_frontmatter("");
+    assert!(fm.is_empty());
+    assert_eq!(body, "");
+}
+
+#[test]
+fn test_parse_frontmatter_only_dashes_no_close() {
+    // Opening --- but no closing --- => treated as no frontmatter
+    let content = "---\nname: Test\nno closing dashes";
+    let (fm, body) = sources::parse_frontmatter(content);
+    assert!(fm.is_empty());
+    assert_eq!(body, content);
+}
+
+#[test]
+fn test_parse_frontmatter_whitespace_trimming() {
+    let content = "---\n  name  :  Spaced Out  \n---\nBody.";
+    let (fm, body) = sources::parse_frontmatter(content);
+    assert_eq!(fm.get("name").map(|s| s.as_str()), Some("Spaced Out"));
+    assert_eq!(body, "Body.");
+}
+
+#[test]
+fn test_parse_frontmatter_empty_value() {
+    let content = "---\nname:\n---\nBody.";
+    let (fm, body) = sources::parse_frontmatter(content);
+    assert_eq!(fm.get("name").map(|s| s.as_str()), Some(""));
+    assert_eq!(body, "Body.");
+}
+
+#[test]
+fn test_parse_frontmatter_multiline_body() {
+    let content = "---\nname: Test\n---\nLine 1\nLine 2\nLine 3";
+    let (fm, body) = sources::parse_frontmatter(content);
+    assert_eq!(fm.get("name").map(|s| s.as_str()), Some("Test"));
+    assert_eq!(body, "Line 1\nLine 2\nLine 3");
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — read_json / write_json helpers
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_read_json_missing_file() {
+    let val = sources::read_json(&std::path::PathBuf::from("/nonexistent/path.json"));
+    assert!(val.is_null());
+}
+
+#[test]
+fn test_read_json_invalid_content() {
+    let tmp = TempDir::new().unwrap();
+    let path = tmp.path().join("bad.json");
+    fs::write(&path, "{{{{not json}}}}").unwrap();
+    let val = sources::read_json(&path);
+    assert!(val.is_null());
+}
+
+#[test]
+fn test_write_json_creates_parent_dirs() {
+    let tmp = TempDir::new().unwrap();
+    let path = tmp.path().join("a/b/c/test.json");
+    let val = serde_json::json!({"key": "value"});
+    sources::write_json(&path, &val).expect("write_json should create dirs");
+
+    let read_back = sources::read_json(&path);
+    assert_eq!(read_back["key"].as_str(), Some("value"));
+}
+
+#[test]
+fn test_write_and_read_json_roundtrip() {
+    let tmp = TempDir::new().unwrap();
+    let path = tmp.path().join("roundtrip.json");
+    let original = serde_json::json!({
+        "name": "test",
+        "count": 42,
+        "nested": {"a": [1, 2, 3]}
+    });
+    sources::write_json(&path, &original).unwrap();
+
+    let read_back = sources::read_json(&path);
+    assert_eq!(read_back, original);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — load_all integration with new modules
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_load_all_includes_stats_plugins_todos() {
+    let wrapper = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let (paths, claude_dir) = make_nested_paths(&wrapper, &project_root);
+
+    // Stats
+    write_fixture(
+        &claude_dir,
+        "stats-cache.json",
+        r#"{"totalSessions": 10, "totalMessages": 100}"#,
+    );
+
+    // Plugins
+    write_fixture(
+        &claude_dir,
+        "plugins/installed_plugins.json",
+        r#"{"plugins": {"test-plugin": [{"version": "1.0.0", "scope": "user"}]}}"#,
+    );
+
+    // Todos
+    write_fixture(
+        &claude_dir,
+        "todos/test.json",
+        r#"[{"id": "1", "content": "Test todo"}]"#,
+    );
+
+    let data = sources::load_all(&paths);
+
+    assert_eq!(data.stats.total_sessions, 10);
+    assert_eq!(data.stats.total_messages, 100);
+    assert_eq!(data.plugins.installed.len(), 1);
+    assert_eq!(data.plugins.installed[0].name, "test-plugin");
+    assert_eq!(data.todos.len(), 1);
+    assert_eq!(data.todos[0].content, "Test todo");
+}
+
+#[test]
+fn test_load_all_empty_includes_default_stats_plugins_todos() {
+    let wrapper = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let (paths, _claude_dir) = make_nested_paths(&wrapper, &project_root);
+
+    let data = sources::load_all(&paths);
+
+    assert_eq!(data.stats.total_sessions, 0);
+    assert!(data.plugins.installed.is_empty());
+    assert!(data.plugins.blocked.is_empty());
+    assert!(data.plugins.marketplaces.is_empty());
+    assert!(data.todos.is_empty());
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — Plugins installed_at truncation edge cases
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_plugins_installed_at_truncation() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "plugins/installed_plugins.json",
+        r#"{
+            "plugins": {
+                "short-date": [{"version": "1.0", "installedAt": "2025"}],
+                "exact-date": [{"version": "1.0", "installedAt": "2025-01-01"}],
+                "long-date": [{"version": "1.0", "installedAt": "2025-01-01T12:00:00.000Z"}],
+                "no-date": [{"version": "1.0"}]
+            }
+        }"#,
+    );
+
+    let data = sources::plugins::load(&paths);
+    assert_eq!(data.installed.len(), 4);
+
+    let find_plugin = |name: &str| data.installed.iter().find(|p| p.name == name).unwrap();
+
+    assert_eq!(find_plugin("short-date").installed_at, "2025"); // < 10 chars, use as-is
+    assert_eq!(find_plugin("exact-date").installed_at, "2025-01-01"); // exactly 10 chars
+    assert_eq!(find_plugin("long-date").installed_at, "2025-01-01"); // truncated
+    assert_eq!(find_plugin("no-date").installed_at, ""); // missing field
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — Plugin registry README truncation
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_plugin_registry_preview_truncates_long_readme() {
+    // Create a README with more than 40 lines
+    let long_readme: String = (0..50)
+        .map(|i| format!("Line {i}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let entry = sources::plugin_registry::PluginEntry {
+        name: "long-readme".to_string(),
+        description: String::new(),
+        version: String::new(),
+        author: String::new(),
+        marketplace: "mp".to_string(),
+        readme: long_readme,
+        has_agents: false,
+        has_skills: false,
+        has_hooks: false,
+        has_commands: false,
+        has_mcp: false,
+    };
+
+    let body = entry.preview_body();
+    assert!(body.contains("Line 0"));
+    assert!(body.contains("Line 39")); // Last line shown (0-indexed, 40 lines)
+    assert!(body.contains("... (truncated)"));
+    assert!(!body.contains("Line 40")); // Not shown
+}
+
+#[test]
+fn test_plugin_registry_preview_short_readme_no_truncation() {
+    let entry = sources::plugin_registry::PluginEntry {
+        name: "short-readme".to_string(),
+        description: String::new(),
+        version: String::new(),
+        author: String::new(),
+        marketplace: "mp".to_string(),
+        readme: "Just one line.".to_string(),
+        has_agents: false,
+        has_skills: false,
+        has_hooks: false,
+        has_commands: false,
+        has_mcp: false,
+    };
+
+    let body = entry.preview_body();
+    assert!(body.contains("Just one line."));
+    assert!(!body.contains("truncated"));
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — Plugins with invalid/malformed JSON structures
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_plugins_invalid_installed_json() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "plugins/installed_plugins.json",
+        "not json at all",
+    );
+
+    let data = sources::plugins::load(&paths);
+    assert!(data.installed.is_empty());
+}
+
+#[test]
+fn test_plugins_invalid_blocklist_json() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(
+        claude_dir.path(),
+        "plugins/blocklist.json",
+        "corrupt",
+    );
+
+    let data = sources::plugins::load(&paths);
+    assert!(data.blocked.is_empty());
+}
+
+#[test]
+fn test_plugins_plugins_key_is_not_object() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    // "plugins" is a string instead of an object
+    write_fixture(
+        claude_dir.path(),
+        "plugins/installed_plugins.json",
+        r#"{"plugins": "not an object"}"#,
+    );
+
+    let data = sources::plugins::load(&paths);
+    assert!(data.installed.is_empty());
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — Plugin registry skips invalid entries
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_plugin_registry_skips_non_directories() {
+    let tmp = TempDir::new().unwrap();
+    let base = tmp.path();
+
+    // Create a file instead of a directory in plugins/
+    let mp_plugins = base.join("marketplaces/mp/plugins");
+    fs::create_dir_all(&mp_plugins).unwrap();
+    fs::write(mp_plugins.join("not-a-dir.txt"), "just a file").unwrap();
+
+    let results = sources::plugin_registry::search_local(base, "").unwrap();
+    assert!(results.is_empty());
+}
+
+#[test]
+fn test_plugin_registry_skips_dir_without_plugin_json() {
+    let tmp = TempDir::new().unwrap();
+    let base = tmp.path();
+
+    let plugin_dir = base.join("marketplaces/mp/plugins/incomplete");
+    fs::create_dir_all(&plugin_dir).unwrap();
+    // No .claude-plugin/plugin.json
+
+    let results = sources::plugin_registry::search_local(base, "").unwrap();
+    assert!(results.is_empty());
+}
+
+#[test]
+fn test_plugin_registry_skips_invalid_json_in_plugin() {
+    let tmp = TempDir::new().unwrap();
+    let base = tmp.path();
+
+    let cp = base.join("marketplaces/mp/plugins/bad-json/.claude-plugin");
+    fs::create_dir_all(&cp).unwrap();
+    fs::write(cp.join("plugin.json"), "{{not json}}").unwrap();
+
+    let results = sources::plugin_registry::search_local(base, "").unwrap();
+    assert!(results.is_empty());
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// NEW TESTS — MCP registry date truncation edge case
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_mcp_registry_preview_body_empty_date() {
+    let entry = sources::mcp_registry::RegistryEntry {
+        name: "test".to_string(),
+        description: String::new(),
+        version: "1.0.0".to_string(),
+        install_command: "npx".to_string(),
+        install_args: vec!["-y".to_string(), "test".to_string()],
+        registry: "npm".to_string(),
+        author: String::new(),
+        date: String::new(),
+        homepage: String::new(),
+        repository: String::new(),
+        npm_url: String::new(),
+        keywords: Vec::new(),
+        score_quality: 0.0,
+        score_popularity: 0.0,
+        score_maintenance: 0.0,
+    };
+
+    let body = entry.preview_body();
+    // Empty date should not show "Published:" line
+    assert!(!body.contains("Published:"));
 }

@@ -8,27 +8,27 @@ use ratatui::{
 
 use crate::app::{App, Focus, Panel, PANELS};
 
+use super::detail::build_detail_items;
+use super::help::render_help;
+use super::markdown::render_markdown;
+use super::search_view::render_search_overlay;
+use super::stats_view::render_stats_dashboard;
+
 pub fn render(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
 
-    // Outer block
+    // Split area into main content + status bar
+    let main_chunks = Layout::vertical([
+        Constraint::Min(1),
+        Constraint::Length(1),
+    ]).split(area);
+
+    // Outer block (no title_bottom — hints moved to status bar)
     let outer = Block::default()
         .borders(Borders::ALL)
-        .title(" lazyclaude — Claude Code Manager ")
-        .title_bottom(Line::from(vec![
-            Span::styled(" q", Style::default().fg(Color::Yellow)),
-            Span::styled("=Quit ", Style::default().fg(Color::DarkGray)),
-            Span::styled("?", Style::default().fg(Color::Yellow)),
-            Span::styled("=Help ", Style::default().fg(Color::DarkGray)),
-            Span::styled("/", Style::default().fg(Color::Yellow)),
-            Span::styled("=Filter ", Style::default().fg(Color::DarkGray)),
-            Span::styled("Tab", Style::default().fg(Color::Yellow)),
-            Span::styled("=Focus ", Style::default().fg(Color::DarkGray)),
-            Span::styled("1-8", Style::default().fg(Color::Yellow)),
-            Span::styled("=Panel ", Style::default().fg(Color::DarkGray)),
-        ]));
-    let inner = outer.inner(area);
-    frame.render_widget(outer, area);
+        .title(" lazyclaude — Claude Code Manager ");
+    let inner = outer.inner(main_chunks[0]);
+    frame.render_widget(outer, main_chunks[0]);
 
     // Split into left (30%) and right (70%)
     let chunks =
@@ -40,12 +40,15 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     } else {
         render_detail(frame, app, chunks[1]);
     }
+
+    // Render persistent status bar
+    render_status_bar(frame, app, main_chunks[1]);
 }
 
 fn render_panels(frame: &mut Frame, app: &mut App, area: Rect) {
     let border_color = match app.focus {
         Focus::Panels => Color::Cyan,
-        Focus::Detail => Color::DarkGray,
+        _ => Color::DarkGray,
     };
 
     // Show project name in the panel title
@@ -66,7 +69,12 @@ fn render_panels(frame: &mut Frame, app: &mut App, area: Rect) {
         .iter()
         .map(|panel| {
             let count = panel.count(app);
-            let label = format!("  {} {} ({})", panel.index() + 1, panel.label(), count);
+            let key = panel.key_label();
+            let label = if *panel == Panel::Stats {
+                format!("  {} {}", key, panel.label())
+            } else {
+                format!("  {} {} ({})", key, panel.label(), count)
+            };
             let style = if *panel == app.active_panel {
                 Style::default()
                     .fg(Color::Cyan)
@@ -95,12 +103,57 @@ fn render_panels(frame: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
-    let border_color = match app.focus {
-        Focus::Panels => Color::DarkGray,
+    // Search overlay takes over the detail pane
+    if let Some(ref overlay) = app.search_overlay {
+        render_search_overlay(frame, overlay, area);
+        return;
+    }
+
+    // Show loading indicator while background search is in progress
+    if app.search_receiver.is_some() {
+        let source_label = app.search_source_pending
+            .map(|s| s.label())
+            .unwrap_or("...");
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan))
+            .title(format!(" Loading {} ", source_label));
+        let loading = Paragraph::new(vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                "  Fetching from remote registry...",
+                Style::default().fg(Color::Yellow),
+            )),
+            Line::from(""),
+            Line::from(Span::styled(
+                "  Please wait.",
+                Style::default().fg(Color::DarkGray),
+            )),
+        ])
+        .block(block);
+        frame.render_widget(loading, area);
+        return;
+    }
+
+    let detail_border = match app.focus {
         Focus::Detail => Color::Cyan,
+        _ => Color::DarkGray,
     };
 
     let panel = app.active_panel;
+
+    // Stats uses a custom dashboard renderer
+    if panel == Panel::Stats {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(detail_border))
+            .title(Span::styled(" Stats ", Style::default().fg(Color::Cyan)));
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+        render_stats_dashboard(frame, &app.data.stats, inner);
+        return;
+    }
+
     let count = panel.count(app);
     let title = if app.filter.is_empty() {
         format!(" {} — {} items ", panel.label(), count)
@@ -110,7 +163,7 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(border_color))
+        .border_style(Style::default().fg(detail_border))
         .title(title);
 
     let inner = block.inner(area);
@@ -120,11 +173,16 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
     app.item_paths = paths;
     app.item_bodies = bodies;
 
+    // Clamp cursor so it never exceeds the (possibly filtered) item count
+    let idx = app.active_panel.index();
+    if !items.is_empty() {
+        app.panel_offsets[idx] = app.panel_offsets[idx].min(items.len().saturating_sub(1));
+    } else {
+        app.panel_offsets[idx] = 0;
+    }
+
     // For panels with content preview, split horizontally
-    let has_preview = matches!(
-        panel,
-        Panel::Config | Panel::Memory | Panel::Skills | Panel::Agents
-    );
+    let has_preview = app.has_preview();
 
     if has_preview && !items.is_empty() {
         let chunks =
@@ -147,13 +205,27 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
             .and_then(|b| b.as_deref())
             .unwrap_or("");
 
+        let preview_focused = app.focus == Focus::Preview;
+        let preview_border_color = if preview_focused {
+            Color::Cyan
+        } else {
+            Color::DarkGray
+        };
+        let preview_title_style = if preview_focused {
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        };
+        let preview_title = if preview_focused {
+            " Preview (j/k scroll) "
+        } else {
+            " Preview "
+        };
+
         let preview_block = Block::default()
             .borders(Borders::LEFT)
-            .border_style(Style::default().fg(Color::DarkGray))
-            .title(Span::styled(
-                " Preview ",
-                Style::default().fg(Color::DarkGray),
-            ));
+            .border_style(Style::default().fg(preview_border_color))
+            .title(Span::styled(preview_title, preview_title_style));
         let preview_inner = preview_block.inner(chunks[1]);
         frame.render_widget(preview_block, chunks[1]);
 
@@ -163,6 +235,11 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
             .scroll((app.detail_scroll as u16, 0));
         frame.render_widget(paragraph, preview_inner);
     } else {
+        // If user was in Preview focus but panel doesn't have preview, snap back
+        if app.focus == Focus::Preview {
+            app.focus = Focus::Detail;
+        }
+
         let mut list_state = ListState::default();
         list_state.select(Some(app.panel_offset()));
 
@@ -180,624 +257,72 @@ fn highlight_style() -> Style {
         .add_modifier(Modifier::BOLD)
 }
 
-// ── Build detail items ──────────────────────────────────────────────────
+fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
+    let panel = app.active_panel;
 
-use std::path::PathBuf;
-
-type ItemRow = (ListItem<'static>, Option<PathBuf>, Option<String>);
-
-fn build_detail_items(
-    app: &App,
-) -> (Vec<ListItem<'static>>, Vec<Option<PathBuf>>, Vec<Option<String>>) {
-    let fl = app.filter.to_lowercase();
-    let matches = |s: &str| app.filter.is_empty() || s.to_lowercase().contains(&fl);
-
-    let mut items = Vec::new();
-    let mut paths: Vec<Option<PathBuf>> = Vec::new();
-    let mut bodies: Vec<Option<String>> = Vec::new();
-
-    match app.active_panel {
-        Panel::Projects => {
-            // First item: Global
-            let style = if app.selected_project == 0 {
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::White)
-            };
-            items.push(ListItem::new(Line::from(vec![
-                Span::styled("  ", Style::default()),
-                Span::styled("Global (User)", style),
-            ])));
-            paths.push(None);
-            bodies.push(None);
-
-            for (i, project) in app.projects.iter().enumerate() {
-                if !matches(&project.short_name) && !matches(&project.name) {
-                    continue;
-                }
-                let selected = app.selected_project == i + 1;
-                let color = if selected {
-                    Color::Green
-                } else if project.exists {
-                    Color::White
-                } else {
-                    Color::DarkGray
-                };
-                let marker = if selected { " *" } else { "" };
-                items.push(ListItem::new(Line::from(vec![
-                    Span::styled("  ", Style::default()),
-                    Span::styled(
-                        project.short_name.clone(),
-                        Style::default().fg(color),
-                    ),
-                    Span::styled(marker.to_string(), Style::default().fg(Color::Green)),
-                    if !project.exists {
-                        Span::styled(" (missing)", Style::default().fg(Color::Red))
-                    } else {
-                        Span::styled("", Style::default())
-                    },
-                ])));
-                paths.push(None);
-                bodies.push(Some(project.name.clone()));
-            }
-        }
-
-        Panel::Config => {
-            let proj: Vec<_> = app.data.claude_md.iter().filter(|f| f.scope == "project").collect();
-            let user: Vec<_> = app.data.claude_md.iter().filter(|f| f.scope == "user").collect();
-            let proj_entries: Vec<ItemRow> = proj
-                .iter()
-                .filter(|f| matches(&f.name))
-                .map(|f| (claude_md_item(f), Some(f.path.clone()), Some(f.content.clone())))
-                .collect();
-            let user_entries: Vec<ItemRow> = user
-                .iter()
-                .filter(|f| matches(&f.name))
-                .map(|f| (claude_md_item(f), Some(f.path.clone()), Some(f.content.clone())))
-                .collect();
-            push_scope_group(&mut items, &mut paths, &mut bodies, &format!("Project ({})", proj.len()), proj_entries);
-            push_scope_group(&mut items, &mut paths, &mut bodies, &format!("User ({})", user.len()), user_entries);
-        }
-
-        Panel::Memory => {
-            for f in &app.data.memory.files {
-                if !matches(&f.name) && !matches(&f.description) {
-                    continue;
-                }
-                let badge = format!("[{}]", &f.mem_type[..f.mem_type.len().min(4)]);
-                items.push(ListItem::new(Line::from(vec![
-                    Span::styled("  ", Style::default()),
-                    Span::styled(f.name.clone(), Style::default().fg(Color::Green)),
-                    Span::styled(format!("  {badge}"), Style::default().fg(Color::Cyan)),
-                ])));
-                paths.push(Some(f.path.clone()));
-                bodies.push(Some(f.body.clone()));
-            }
-        }
-
-        Panel::Skills => {
-            let proj: Vec<_> = app.data.skills.iter().filter(|s| s.scope == "project").collect();
-            let user: Vec<_> = app.data.skills.iter().filter(|s| s.scope == "user").collect();
-            let proj_entries: Vec<ItemRow> = proj
-                .iter()
-                .filter(|s| matches(&s.name) || matches(&s.description))
-                .map(|s| (skill_item(s), Some(s.path.clone()), Some(s.body.clone())))
-                .collect();
-            let user_entries: Vec<ItemRow> = user
-                .iter()
-                .filter(|s| matches(&s.name) || matches(&s.description))
-                .map(|s| (skill_item(s), Some(s.path.clone()), Some(s.body.clone())))
-                .collect();
-            push_scope_group(&mut items, &mut paths, &mut bodies, &format!("Project ({})", proj.len()), proj_entries);
-            push_scope_group(&mut items, &mut paths, &mut bodies, &format!("User ({})", user.len()), user_entries);
-        }
-
-        Panel::Agents => {
-            let proj: Vec<_> = app.data.agents.iter().filter(|a| a.scope == "project").collect();
-            let user: Vec<_> = app.data.agents.iter().filter(|a| a.scope == "user").collect();
-            let proj_entries: Vec<ItemRow> = proj
-                .iter()
-                .filter(|a| matches(&a.name) || matches(&a.description))
-                .map(|a| (agent_item(a), Some(a.path.clone()), Some(a.body.clone())))
-                .collect();
-            let user_entries: Vec<ItemRow> = user
-                .iter()
-                .filter(|a| matches(&a.name) || matches(&a.description))
-                .map(|a| (agent_item(a), Some(a.path.clone()), Some(a.body.clone())))
-                .collect();
-            push_scope_group(&mut items, &mut paths, &mut bodies, &format!("Project ({})", proj.len()), proj_entries);
-            push_scope_group(&mut items, &mut paths, &mut bodies, &format!("User ({})", user.len()), user_entries);
-        }
-
-        Panel::Mcp => {
-            if app.mcp_search_active {
-                for entry in &app.registry_results {
-                    if !matches(&entry.name) {
-                        continue;
-                    }
-                    let desc = if entry.description.len() > 60 {
-                        format!("{}...", &entry.description[..57])
-                    } else {
-                        entry.description.clone()
-                    };
-                    items.push(ListItem::new(Line::from(vec![
-                        Span::styled("  ", Style::default()),
-                        Span::styled(entry.name.clone(), Style::default().fg(Color::Green)),
-                        Span::styled(
-                            format!("  v{}", entry.version),
-                            Style::default().fg(Color::Cyan),
-                        ),
-                        Span::styled(format!("  {desc}"), Style::default().fg(Color::DarkGray)),
-                    ])));
-                    paths.push(None);
-                    bodies.push(None);
-                }
-            } else {
-                let proj_entries: Vec<ItemRow> = app
-                    .data
-                    .mcp
-                    .project
-                    .iter()
-                    .filter(|s| matches(&s.name))
-                    .map(|s| (mcp_item(s), None, None))
-                    .collect();
-                let user_entries: Vec<ItemRow> = app
-                    .data
-                    .mcp
-                    .user
-                    .iter()
-                    .filter(|s| matches(&s.name))
-                    .map(|s| (mcp_item(s), None, None))
-                    .collect();
-                push_scope_group(
-                    &mut items,
-                    &mut paths,
-                    &mut bodies,
-                    &format!("Project ({})", app.data.mcp.project.len()),
-                    proj_entries,
-                );
-                push_scope_group(
-                    &mut items,
-                    &mut paths,
-                    &mut bodies,
-                    &format!("User ({})", app.data.mcp.user.len()),
-                    user_entries,
-                );
-            }
-        }
-
-        Panel::Settings => {
-            let perms = &app.data.settings.permissions;
-            if !perms.allow.is_empty() {
-                items.push(ListItem::new(Line::from(Span::styled(
-                    "  Allow",
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::BOLD),
-                ))));
-                paths.push(None);
-                bodies.push(None);
-                for rule in &perms.allow {
-                    if !matches(&rule.rule) {
-                        continue;
-                    }
-                    items.push(ListItem::new(Line::from(vec![
-                        Span::styled("    ", Style::default()),
-                        Span::styled(rule.rule.clone(), Style::default().fg(Color::White)),
-                        Span::styled(
-                            format!("  [{}]", rule.scope),
-                            Style::default().fg(Color::Cyan),
-                        ),
-                    ])));
-                    paths.push(None);
-                    bodies.push(None);
-                }
-            }
-            if !perms.deny.is_empty() {
-                items.push(ListItem::new(Line::from(Span::styled(
-                    "  Deny",
-                    Style::default()
-                        .fg(Color::Red)
-                        .add_modifier(Modifier::BOLD),
-                ))));
-                paths.push(None);
-                bodies.push(None);
-                for rule in &perms.deny {
-                    if !matches(&rule.rule) {
-                        continue;
-                    }
-                    items.push(ListItem::new(Line::from(vec![
-                        Span::styled("    ", Style::default()),
-                        Span::styled(rule.rule.clone(), Style::default().fg(Color::White)),
-                        Span::styled(
-                            format!("  [{}]", rule.scope),
-                            Style::default().fg(Color::Red),
-                        ),
-                    ])));
-                    paths.push(None);
-                    bodies.push(None);
-                }
-            }
-
-            // Hooks sub-section
-            if !app.data.hooks.is_empty() {
-                items.push(ListItem::new(Line::from(Span::styled(
-                    "  Hooks",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ))));
-                paths.push(None);
-                bodies.push(None);
-                let mut cur_event = String::new();
-                for hook in &app.data.hooks {
-                    if !matches(&hook.command) && !matches(&hook.event) && !matches(&hook.matcher) {
-                        continue;
-                    }
-                    if hook.event != cur_event {
-                        cur_event.clone_from(&hook.event);
-                        items.push(ListItem::new(Line::from(Span::styled(
-                            format!("    {cur_event}"),
-                            Style::default()
-                                .fg(Color::Cyan)
-                                .add_modifier(Modifier::BOLD),
-                        ))));
-                        paths.push(None);
-                        bodies.push(None);
-                    }
-                    items.push(ListItem::new(Line::from(vec![
-                        Span::styled("      ", Style::default()),
-                        Span::styled(hook.matcher.clone(), Style::default().fg(Color::Green)),
-                        Span::styled(" -> ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(hook.command.clone(), Style::default().fg(Color::White)),
-                    ])));
-                    paths.push(None);
-                    bodies.push(None);
-                }
-            }
-
-            // Keybindings sub-section
-            if !app.data.keybindings.is_empty() {
-                items.push(ListItem::new(Line::from(Span::styled(
-                    "  Keybindings",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ))));
-                paths.push(None);
-                bodies.push(None);
-                for b in &app.data.keybindings {
-                    if !matches(&b.key) && !matches(&b.command) {
-                        continue;
-                    }
-                    let mut spans = vec![
-                        Span::styled("    ", Style::default()),
-                        Span::styled(
-                            b.key.clone(),
-                            Style::default()
-                                .fg(Color::Yellow)
-                                .add_modifier(Modifier::BOLD),
-                        ),
-                        Span::styled(" -> ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(b.command.clone(), Style::default().fg(Color::White)),
-                    ];
-                    if !b.context.is_empty() {
-                        spans.push(Span::styled(
-                            format!("  [{}]", b.context),
-                            Style::default().fg(Color::Cyan),
-                        ));
-                    }
-                    items.push(ListItem::new(Line::from(spans)));
-                    paths.push(None);
-                    bodies.push(None);
-                }
-            }
-
-            // General settings
-            if let Some(obj) = app.data.settings.effective.as_object() {
-                let general: Vec<_> = obj
-                    .iter()
-                    .filter(|(k, _)| *k != "permissions" && *k != "hooks")
-                    .collect();
-                if !general.is_empty() {
-                    items.push(ListItem::new(Line::from(Span::styled(
-                        "  General",
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    ))));
-                    paths.push(None);
-                    bodies.push(None);
-                    for (key, value) in &general {
-                        let val_str = match value {
-                            serde_json::Value::String(s) => s.clone(),
-                            other => other.to_string(),
-                        };
-                        items.push(ListItem::new(Line::from(vec![
-                            Span::styled("    ", Style::default()),
-                            Span::styled(key.to_string(), Style::default().fg(Color::Cyan)),
-                            Span::styled(": ", Style::default().fg(Color::DarkGray)),
-                            Span::styled(val_str, Style::default().fg(Color::White)),
-                        ])));
-                        paths.push(None);
-                        bodies.push(None);
-                    }
-                }
-            }
-        }
-
-        Panel::Sessions => {
-            for session in &app.data.sessions {
-                if !matches(&session.id) {
-                    continue;
-                }
-                let size = if session.size < 1024 {
-                    format!("{} B", session.size)
-                } else if session.size < 1024 * 1024 {
-                    format!("{:.1} KB", session.size as f64 / 1024.0)
-                } else {
-                    format!("{:.1} MB", session.size as f64 / (1024.0 * 1024.0))
-                };
-                let summary = session
-                    .summary
-                    .as_deref()
-                    .unwrap_or("(no summary)");
-                items.push(ListItem::new(Line::from(vec![
-                    Span::styled("  ", Style::default()),
-                    Span::styled(
-                        session.id[..session.id.len().min(8)].to_string(),
-                        Style::default().fg(Color::Yellow),
-                    ),
-                    Span::styled(format!("  {size}"), Style::default().fg(Color::DarkGray)),
-                    Span::styled(
-                        format!("  {summary}"),
-                        Style::default().fg(Color::White),
-                    ),
-                ])));
-                paths.push(Some(session.path.clone()));
-                bodies.push(None);
-            }
-            if app.data.sessions.is_empty() {
-                items.push(ListItem::new(Line::from(Span::styled(
-                    "  No sessions",
-                    Style::default().fg(Color::DarkGray),
-                ))));
-                paths.push(None);
-                bodies.push(None);
-            }
-        }
-    }
-
-    (items, paths, bodies)
-}
-
-// ── Scope group helper ──────────────────────────────────────────────────
-
-fn scope_header(label: &str) -> ListItem<'static> {
-    ListItem::new(Line::from(Span::styled(
-        format!("  {label}"),
-        Style::default()
-            .fg(Color::Yellow)
-            .add_modifier(Modifier::BOLD),
-    )))
-}
-
-fn empty_hint(msg: &str) -> ListItem<'static> {
-    ListItem::new(Line::from(Span::styled(
-        format!("    {msg}"),
-        Style::default().fg(Color::DarkGray),
-    )))
-}
-
-fn push_scope_group(
-    items: &mut Vec<ListItem<'static>>,
-    paths: &mut Vec<Option<PathBuf>>,
-    bodies: &mut Vec<Option<String>>,
-    header: &str,
-    entries: Vec<(ListItem<'static>, Option<PathBuf>, Option<String>)>,
-) {
-    items.push(scope_header(header));
-    paths.push(None);
-    bodies.push(None);
-    if entries.is_empty() {
-        items.push(empty_hint("none"));
-        paths.push(None);
-        bodies.push(None);
+    // Left side: project + panel + filter
+    let project_name = if app.selected_project == 0 {
+        "Global".to_string()
     } else {
-        for (item, path, body) in entries {
-            items.push(item);
-            paths.push(path);
-            bodies.push(body);
-        }
-    }
-}
-
-// ── Item builders ───────────────────────────────────────────────────────
-
-fn skill_item(s: &lazyclaude::sources::Skill) -> ListItem<'static> {
-    let (badge, color) = if s.user_invocable {
-        ("[inv]", Color::Green)
-    } else {
-        ("[int]", Color::DarkGray)
+        app.projects.get(app.selected_project - 1)
+            .map(|p| p.short_name.clone())
+            .unwrap_or("?".to_string())
     };
-    ListItem::new(Line::from(vec![
-        Span::styled("    ", Style::default()),
-        Span::styled(s.name.clone(), Style::default().fg(color)),
-        Span::styled(format!("  {badge}"), Style::default().fg(color)),
-    ]))
-}
 
-fn agent_item(a: &lazyclaude::sources::Agent) -> ListItem<'static> {
-    let mut spans = vec![
-        Span::styled("    ", Style::default()),
-        Span::styled(a.name.clone(), Style::default().fg(Color::Green)),
+    let mut left_spans = vec![
+        Span::styled(format!(" {} ", project_name), Style::default().fg(Color::Black).bg(Color::Cyan)),
+        Span::styled(format!(" {} ", panel.label()), Style::default().fg(Color::Cyan)),
     ];
-    if !a.model.is_empty() {
-        spans.push(Span::styled(
-            format!("  {}", a.model),
+
+    if !app.filter.is_empty() {
+        left_spans.push(Span::styled(
+            format!(" /{} ", app.filter),
             Style::default().fg(Color::Yellow),
         ));
     }
-    ListItem::new(Line::from(spans))
-}
 
-fn mcp_item(s: &lazyclaude::sources::McpServer) -> ListItem<'static> {
-    let (badge, badge_color, name_color) = if s.disabled {
-        ("  ●", Color::Red, Color::DarkGray)
-    } else {
-        ("  ●", Color::Green, Color::White)
+    // Right side: context-specific key hints
+    let hints = match panel {
+        Panel::Skills => "s=Search a=Create e=Edit d=Delete y=Copy",
+        Panel::Agents => "a=Create e=Edit d=Delete y=Copy",
+        Panel::Mcp => "s=Search a=Add t=Toggle d=Delete y=Copy",
+        Panel::Settings => "a=Allow D=Deny d=Delete y=Copy",
+        Panel::Plugins => "s=Search d=Remove y=Copy",
+        Panel::Memory => "e=Edit d=Delete y=Copy",
+        Panel::Config => "e=Edit y=Copy",
+        Panel::Projects => "Enter=Select",
+        Panel::Sessions => "y=Copy",
+        Panel::Stats => "",
+        Panel::Todos => "",
     };
-    let cmd = format!("{} {}", s.command, s.args.join(" "));
-    ListItem::new(Line::from(vec![
-        Span::styled("   ", Style::default()),
-        Span::styled(badge, Style::default().fg(badge_color)),
-        Span::styled(format!(" {}", s.name), Style::default().fg(name_color)),
-        Span::styled(format!("  {cmd}"), Style::default().fg(Color::DarkGray)),
-    ]))
-}
 
-fn claude_md_item(f: &lazyclaude::sources::ClaudeMdFile) -> ListItem<'static> {
-    let size = if f.size < 1024 {
-        format!("{} B", f.size)
-    } else {
-        format!("{:.1} KB", f.size as f64 / 1024.0)
-    };
-    let tag = if f.file_type == "rule" { " [rule]" } else { "" };
-    ListItem::new(Line::from(vec![
-        Span::styled("    ", Style::default()),
-        Span::styled(f.name.clone(), Style::default().fg(Color::Green)),
-        Span::styled(
-            format!("{tag}  {size}"),
-            Style::default().fg(Color::DarkGray),
-        ),
-    ]))
-}
+    let right_span = Span::styled(
+        format!("{} ", hints),
+        Style::default().fg(Color::DarkGray),
+    );
 
-// ── Markdown preview ────────────────────────────────────────────────────
+    // Render: left-aligned spans + right-aligned hints
+    let left_line = Line::from(left_spans);
+    let right_line = Line::from(right_span);
 
-fn render_markdown(content: &str) -> Vec<Line<'static>> {
-    let mut lines = Vec::new();
+    // Render left part with background
+    frame.render_widget(
+        Paragraph::new(left_line).style(Style::default().bg(Color::DarkGray)),
+        area,
+    );
 
-    for raw_line in content.lines() {
-        let trimmed = raw_line.trim_start();
-
-        if trimmed.starts_with("# ") {
-            lines.push(Line::from(Span::styled(
-                format!(" {}", &trimmed[2..]),
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            )));
-        } else if trimmed.starts_with("## ") {
-            lines.push(Line::from(Span::styled(
-                format!(" {}", &trimmed[3..]),
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            )));
-        } else if trimmed.starts_with("### ") {
-            lines.push(Line::from(Span::styled(
-                format!(" {}", &trimmed[4..]),
-                Style::default().fg(Color::Yellow),
-            )));
-        } else if trimmed.starts_with("---") && trimmed.chars().all(|c| c == '-') {
-            lines.push(Line::from(Span::styled(
-                " ---",
-                Style::default().fg(Color::DarkGray),
-            )));
-        } else if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-            lines.push(Line::from(vec![
-                Span::styled(" ", Style::default()),
-                Span::styled("  ", Style::default().fg(Color::Green)),
-                Span::styled(
-                    trimmed[2..].to_string(),
-                    Style::default().fg(Color::White),
-                ),
-            ]));
-        } else if trimmed.starts_with("```") {
-            lines.push(Line::from(Span::styled(
-                format!(" {trimmed}"),
-                Style::default().fg(Color::DarkGray),
-            )));
-        } else if trimmed.contains(':') && !trimmed.starts_with(' ') && lines.len() < 20 {
-            if let Some((key, val)) = trimmed.split_once(':') {
-                lines.push(Line::from(vec![
-                    Span::styled(format!(" {}", key.trim()), Style::default().fg(Color::Cyan)),
-                    Span::styled(": ", Style::default().fg(Color::DarkGray)),
-                    Span::styled(val.trim().to_string(), Style::default().fg(Color::White)),
-                ]));
-            } else {
-                lines.push(Line::from(Span::styled(
-                    format!(" {raw_line}"),
-                    Style::default().fg(Color::White),
-                )));
-            }
-        } else if trimmed.is_empty() {
-            lines.push(Line::from(""));
-        } else {
-            lines.push(Line::from(Span::styled(
-                format!(" {raw_line}"),
-                Style::default().fg(Color::White),
-            )));
-        }
+    // Overlay right-aligned hints
+    let hints_width = hints.len() as u16 + 1;
+    if area.width > hints_width {
+        let right_area = Rect {
+            x: area.x + area.width - hints_width,
+            y: area.y,
+            width: hints_width,
+            height: 1,
+        };
+        frame.render_widget(
+            Paragraph::new(right_line).style(Style::default().bg(Color::DarkGray)),
+            right_area,
+        );
     }
-
-    if lines.is_empty() {
-        lines.push(Line::from(Span::styled(
-            " (empty)",
-            Style::default().fg(Color::DarkGray),
-        )));
-    }
-
-    lines
-}
-
-// ── Help ────────────────────────────────────────────────────────────────
-
-fn render_help(frame: &mut Frame, area: Rect) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan))
-        .title(" Help ");
-
-    let help_text = vec![
-        Line::from(""),
-        help_line("1-8", "Switch panel"),
-        help_line("j/k", "Navigate items"),
-        help_line("J/K", "Scroll detail preview"),
-        help_line("Enter", "Select project / confirm action"),
-        help_line("l", "Focus detail pane"),
-        help_line("h/BS", "Back to panels"),
-        help_line("Tab", "Toggle panels/detail focus"),
-        help_line("/", "Filter items"),
-        help_line("?", "Toggle help"),
-        help_line("R", "Refresh data"),
-        help_line("q", "Quit"),
-        Line::from(""),
-        Line::from(Span::styled(
-            "  Panel actions:",
-            Style::default().fg(Color::DarkGray),
-        )),
-        help_line("e", "Edit in $EDITOR (Config/Memory/Skills/Agents)"),
-        help_line("a", "Add item (Settings/MCP)"),
-        help_line("d", "Delete item (Settings)"),
-        help_line("D", "Add deny permission (Settings)"),
-        help_line("t", "Toggle server (MCP)"),
-        help_line("s", "Search registry (MCP)"),
-    ];
-
-    let paragraph = Paragraph::new(help_text).block(block);
-    frame.render_widget(paragraph, area);
-}
-
-fn help_line<'a>(key: &'a str, desc: &'a str) -> Line<'a> {
-    Line::from(vec![
-        Span::styled(
-            format!("  {:<10}", key),
-            Style::default().fg(Color::Yellow),
-        ),
-        Span::styled(desc, Style::default().fg(Color::White)),
-    ])
 }

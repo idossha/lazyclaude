@@ -1,5 +1,9 @@
 pub mod dashboard;
-pub mod views;
+mod detail;
+mod help;
+mod markdown;
+mod search_view;
+mod stats_view;
 
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
@@ -9,8 +13,6 @@ use ratatui::Frame;
 use crate::app::{App, InputMode};
 
 pub fn render(frame: &mut Frame, app: &mut App) {
-    // For now, use the dashboard renderer which handles the new panel layout.
-    // The views module is available for future detail-pane rendering.
     dashboard::render(frame, app);
 
     // Render input/confirm overlay on top
@@ -69,7 +71,7 @@ fn render_overlay(frame: &mut Frame, app: &App) {
 }
 
 fn render_message(frame: &mut Frame, app: &mut App) {
-    if let Some(msg) = app.message.take() {
+    if let Some(ref msg) = app.message {
         let area = frame.area();
         let msg_area = Rect {
             x: area.x + 2,
@@ -77,7 +79,14 @@ fn render_message(frame: &mut Frame, app: &mut App) {
             width: area.width.saturating_sub(4).min(msg.len() as u16 + 2),
             height: 1,
         };
-        let paragraph = Paragraph::new(msg).style(Style::default().fg(Color::Green));
+        let paragraph = Paragraph::new(msg.clone()).style(Style::default().fg(Color::Green));
         frame.render_widget(paragraph, msg_area);
+
+        // Decrement TTL; clear message when expired
+        if app.message_ttl == 0 {
+            app.message = None;
+        } else {
+            app.message_ttl -= 1;
+        }
     }
 }

@@ -1,20 +1,25 @@
 use crate::config::Paths;
-use crate::sources::{parse_frontmatter, Skill};
+use crate::sources::{parse_frontmatter, Scope, Skill};
 
 pub fn load(paths: &Paths) -> Vec<Skill> {
     let mut skills = Vec::new();
 
-    scan_dir(&mut skills, &paths.user_skills_dir(), "user");
-    scan_dir(&mut skills, &paths.project_skills_dir(), "project");
+    scan_dir(&mut skills, &paths.user_skills_dir(), Scope::User);
+    scan_dir(&mut skills, &paths.project_skills_dir(), Scope::Project);
 
     skills.sort_by(|a, b| a.name.cmp(&b.name));
     skills
 }
 
-fn scan_dir(skills: &mut Vec<Skill>, dir: &std::path::Path, scope: &str) {
+fn scan_dir(skills: &mut Vec<Skill>, dir: &std::path::Path, scope: Scope) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
-        Err(_) => return,
+        Err(e) => {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                tracing::warn!("Failed to read skills dir {}: {}", dir.display(), e);
+            }
+            return;
+        }
     };
 
     for entry in entries.flatten() {
@@ -44,8 +49,16 @@ fn scan_dir(skills: &mut Vec<Skill>, dir: &std::path::Path, scope: &str) {
                     .unwrap_or(false),
                 body,
                 dir_name,
-                scope: scope.to_string(),
+                scope,
             });
         }
     }
+}
+
+/// Delete a skill by removing its parent directory (e.g. skills/my-skill/).
+pub fn remove(skill_file: &std::path::Path) -> anyhow::Result<()> {
+    if let Some(dir) = skill_file.parent() {
+        std::fs::remove_dir_all(dir)?;
+    }
+    Ok(())
 }
