@@ -1,69 +1,111 @@
-# ccm — Claude Code Manager
+# lazyclaude
 
-TUI dashboard for managing Claude Code configuration. One place to view and edit memory, skills, MCP servers, permissions, hooks, instructions, keybindings, and agents — across user and project scopes.
+A lazygit-inspired TUI for managing Claude Code configuration. One place to view and edit memory, skills, MCP servers, permissions, hooks, instructions, keybindings, agents, and sessions — across user and project scopes.
 
 ## Install
 
+### Prebuilt binaries (recommended)
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/idohaber/lazyclaude/releases/latest), then:
+
 ```sh
+tar xzf lazyclaude-*.tar.gz
+sudo install lazyclaude-*/lazyclaude /usr/local/bin/
+```
+
+### From crates.io
+
+```sh
+cargo install lazyclaude
+```
+
+### From source
+
+```sh
+git clone https://github.com/idohaber/lazyclaude.git
+cd lazyclaude
 cargo install --path .
 ```
 
 ## Usage
 
 ```sh
-ccm            # launch TUI
-ccm --json     # dump all config as JSON (for scripting / nvim integration)
-ccm list mcp   # list a single source as JSON
-ccm paths      # show resolved config paths
+lazyclaude                    # launch TUI
+lazyclaude --json             # dump all config as JSON
+lazyclaude list mcp           # list a single source as JSON
+lazyclaude paths              # show resolved config paths
 ```
 
-Override paths for testing or custom setups:
+Override paths for custom setups:
 
 ```sh
-ccm --claude-dir ~/.claude --project-dir /path/to/project
+lazyclaude --claude-dir ~/.claude --project-dir /path/to/project
 ```
+
+Available sources for `list`: `memory`, `skills`, `mcp`, `settings`, `hooks`, `claude-md`, `keybindings`, `agents`.
 
 ## Navigation
 
 | Key | Action |
 |-----|--------|
+| `1-8` | Switch panel directly |
 | `j/k` | Move up/down |
-| `Enter` | Zoom into section |
-| `h/Esc` | Back to dashboard |
-| `Tab` | Switch panes |
-| `/` | Filter |
-| `a` | Add item |
-| `d` | Delete item |
-| `e` | Edit in $EDITOR |
-| `t` | Toggle (MCP) |
-| `s` | Search MCP registry |
-| `R` | Refresh |
+| `J/K` | Scroll detail preview |
+| `Enter` | Select project / confirm action |
+| `l` | Focus detail pane |
+| `h/BS` | Back to panels |
+| `Tab` | Toggle panels/detail focus |
+| `/` | Filter items |
+| `Esc` | Clear filter / back |
 | `?` | Help |
+| `R` | Refresh data |
 | `q` | Quit |
 
-## What it manages
+### Panel actions
 
-| Section | Scope | Read | Write |
-|---------|-------|------|-------|
-| Memory | Project | yes | Edit |
-| Skills | User + Project | yes | -- |
-| MCP Servers | User + Project | yes | Add/Remove/Toggle/Search |
-| Permissions | User/Project/Local | yes | Add/Delete |
-| Hooks | User/Project/Local | yes | -- |
-| CLAUDE.md & Rules | User + Project | yes | Edit |
-| Keybindings | User | yes | -- |
-| Agents | User + Project | yes | -- |
+| Key | Action |
+|-----|--------|
+| `e` | Edit in `$EDITOR` (Config/Memory/Skills/Agents) |
+| `a` | Add item (Settings/MCP) |
+| `d` | Delete item (Settings/MCP) |
+| `D` | Add deny permission (Settings) |
+| `t` | Toggle server (MCP) |
+| `s` | Search registry (MCP) |
+
+## Panels
+
+| # | Panel | Scope | Read | Write |
+|---|-------|-------|------|-------|
+| 1 | Projects | -- | yes | Switch active project |
+| 2 | Config | User + Project | yes | Edit |
+| 3 | Memory | Project | yes | Edit |
+| 4 | Skills | User + Project | yes | -- |
+| 5 | Agents | User + Project | yes | -- |
+| 6 | MCP Servers | User + Project | yes | Add/Remove/Toggle/Search |
+| 7 | Settings | User/Project/Local | yes | Add/Delete |
+| 8 | Sessions | Project | yes | -- |
 
 ## Architecture
 
-ccm is split into a library (`ccm::config`, `ccm::sources`) and a TUI binary. The library can be used by external tools:
+lazyclaude is split into a library (`lazyclaude::config`, `lazyclaude::sources`) and a TUI binary. The library can be used by external tools:
 
 ```rust
-let paths = ccm::config::Paths::detect();
-let data = ccm::sources::load_all(&paths);
+let paths = lazyclaude::config::Paths::detect();
+let data  = lazyclaude::sources::load_all(&paths);
 ```
 
-The `--json` flag and `list` subcommand output structured JSON, enabling integration with nvim plugins, scripts, or other tools via subprocess + JSON parsing.
+The `--json` flag and `list` subcommand output structured JSON, enabling integration with editor plugins, scripts, or other tools.
+
+## Releasing
+
+Tag a version to trigger a release build:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+GitHub Actions builds binaries for macOS (x86_64, aarch64) and Linux (x86_64, aarch64), then publishes them as a GitHub Release.
 
 ## License
 
