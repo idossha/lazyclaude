@@ -26,7 +26,11 @@ impl App {
         let scope = parse_scope(parts[2])?;
         let rule_index: usize = parts[3].parse().ok()?;
         let perms = &self.data.settings.permissions;
-        let rules = if kind == "allow" { &perms.allow } else { &perms.deny };
+        let rules = if kind == "allow" {
+            &perms.allow
+        } else {
+            &perms.deny
+        };
         let rule_text = rules.get(rule_index).map(|r| r.rule.clone())?;
         Some((kind, scope, rule_index, rule_text))
     }
@@ -35,7 +39,8 @@ impl App {
     /// Returns None if the cursor is on a header or "none" hint.
     pub(crate) fn resolve_mcp_server(&self) -> Option<(Scope, String)> {
         let idx = self.panel_offset();
-        self.item_paths.get(idx)
+        self.item_paths
+            .get(idx)
             .and_then(|p| p.as_ref())
             .and_then(|p| {
                 let s = p.to_string_lossy();
@@ -50,7 +55,8 @@ impl App {
     /// kind is "installed", "blocked", or "marketplace". Returns None on headers.
     pub(crate) fn resolve_plugin(&self) -> Option<(String, String)> {
         let idx = self.panel_offset();
-        self.item_paths.get(idx)
+        self.item_paths
+            .get(idx)
             .and_then(|p| p.as_ref())
             .and_then(|p| {
                 let s = p.to_string_lossy();

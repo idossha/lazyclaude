@@ -1,28 +1,24 @@
-use crossterm::event::{MouseEvent, MouseEventKind, MouseButton};
+use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
 use super::*;
 
 impl App {
     pub(super) fn handle_mouse(&mut self, mouse: MouseEvent) {
         match mouse.kind {
-            MouseEventKind::ScrollUp => {
-                match self.focus {
-                    Focus::Panels => self.move_panel_up(),
-                    Focus::Detail => self.move_up(),
-                    Focus::Preview => {
-                        self.detail_scroll = self.detail_scroll.saturating_sub(3);
-                    }
+            MouseEventKind::ScrollUp => match self.focus {
+                Focus::Panels => self.move_panel_up(),
+                Focus::Detail => self.move_up(),
+                Focus::Preview => {
+                    self.detail_scroll = self.detail_scroll.saturating_sub(3);
                 }
-            }
-            MouseEventKind::ScrollDown => {
-                match self.focus {
-                    Focus::Panels => self.move_panel_down(),
-                    Focus::Detail => self.move_down(),
-                    Focus::Preview => {
-                        self.detail_scroll = self.detail_scroll.saturating_add(3);
-                    }
+            },
+            MouseEventKind::ScrollDown => match self.focus {
+                Focus::Panels => self.move_panel_down(),
+                Focus::Detail => self.move_down(),
+                Focus::Preview => {
+                    self.detail_scroll = self.detail_scroll.saturating_add(3);
                 }
-            }
+            },
             MouseEventKind::Down(MouseButton::Left) => {
                 // Determine which area was clicked based on x position
                 // The layout is 30% panels (left), 70% detail (right)

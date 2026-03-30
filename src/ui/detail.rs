@@ -13,13 +13,15 @@ pub(crate) type ItemRow = (ListItem<'static>, Option<PathBuf>, Option<String>);
 
 pub(crate) fn build_detail_items(
     app: &App,
-) -> (Vec<ListItem<'static>>, Vec<Option<PathBuf>>, Vec<Option<String>>) {
+) -> (
+    Vec<ListItem<'static>>,
+    Vec<Option<PathBuf>>,
+    Vec<Option<String>>,
+) {
     use fuzzy_matcher::skim::SkimMatcherV2;
     use fuzzy_matcher::FuzzyMatcher;
     let matcher = SkimMatcherV2::default();
-    let matches = |s: &str| {
-        app.filter.is_empty() || matcher.fuzzy_match(s, &app.filter).is_some()
-    };
+    let matches = |s: &str| app.filter.is_empty() || matcher.fuzzy_match(s, &app.filter).is_some();
 
     let mut items = Vec::new();
     let mut paths: Vec<Option<PathBuf>> = Vec::new();
@@ -57,10 +59,7 @@ pub(crate) fn build_detail_items(
                 let marker = if selected { " *" } else { "" };
                 items.push(ListItem::new(Line::from(vec![
                     Span::styled("  ", Style::default()),
-                    Span::styled(
-                        project.short_name.clone(),
-                        Style::default().fg(color),
-                    ),
+                    Span::styled(project.short_name.clone(), Style::default().fg(color)),
                     Span::styled(marker.to_string(), Style::default().fg(Color::Green)),
                     if !project.exists {
                         Span::styled(" (missing)", Style::default().fg(Color::Red))
@@ -74,20 +73,54 @@ pub(crate) fn build_detail_items(
         }
 
         Panel::Config => {
-            let proj: Vec<_> = app.data.claude_md.iter().filter(|f| f.scope == Scope::Project).collect();
-            let user: Vec<_> = app.data.claude_md.iter().filter(|f| f.scope == Scope::User).collect();
+            let proj: Vec<_> = app
+                .data
+                .claude_md
+                .iter()
+                .filter(|f| f.scope == Scope::Project)
+                .collect();
+            let user: Vec<_> = app
+                .data
+                .claude_md
+                .iter()
+                .filter(|f| f.scope == Scope::User)
+                .collect();
             let proj_entries: Vec<ItemRow> = proj
                 .iter()
                 .filter(|f| matches(&f.name))
-                .map(|f| (claude_md_item(f), Some(f.path.clone()), Some(f.content.clone())))
+                .map(|f| {
+                    (
+                        claude_md_item(f),
+                        Some(f.path.clone()),
+                        Some(f.content.clone()),
+                    )
+                })
                 .collect();
             let user_entries: Vec<ItemRow> = user
                 .iter()
                 .filter(|f| matches(&f.name))
-                .map(|f| (claude_md_item(f), Some(f.path.clone()), Some(f.content.clone())))
+                .map(|f| {
+                    (
+                        claude_md_item(f),
+                        Some(f.path.clone()),
+                        Some(f.content.clone()),
+                    )
+                })
                 .collect();
-            push_scope_group(&mut items, &mut paths, &mut bodies, &format!("Project ({})", proj.len()), proj_entries);
-            push_scope_group(&mut items, &mut paths, &mut bodies, &format!("User ({})", user.len()), user_entries);
+            push_scope_group(
+                &mut items,
+                &mut paths,
+                &mut bodies,
+                &format!("Project ({})", proj.len()),
+                proj_entries,
+            );
+            push_scope_group(
+                &mut items,
+                &mut paths,
+                &mut bodies,
+                &format!("User ({})", user.len()),
+                user_entries,
+            );
         }
 
         Panel::Memory => {
@@ -107,8 +140,18 @@ pub(crate) fn build_detail_items(
         }
 
         Panel::Skills => {
-            let proj: Vec<_> = app.data.skills.iter().filter(|s| s.scope == Scope::Project).collect();
-            let user: Vec<_> = app.data.skills.iter().filter(|s| s.scope == Scope::User).collect();
+            let proj: Vec<_> = app
+                .data
+                .skills
+                .iter()
+                .filter(|s| s.scope == Scope::Project)
+                .collect();
+            let user: Vec<_> = app
+                .data
+                .skills
+                .iter()
+                .filter(|s| s.scope == Scope::User)
+                .collect();
             let proj_entries: Vec<ItemRow> = proj
                 .iter()
                 .filter(|s| matches(&s.name) || matches(&s.description))
@@ -119,13 +162,35 @@ pub(crate) fn build_detail_items(
                 .filter(|s| matches(&s.name) || matches(&s.description))
                 .map(|s| (skill_item(s), Some(s.path.clone()), Some(s.body.clone())))
                 .collect();
-            push_scope_group(&mut items, &mut paths, &mut bodies, &format!("Project ({})", proj.len()), proj_entries);
-            push_scope_group(&mut items, &mut paths, &mut bodies, &format!("User ({})", user.len()), user_entries);
+            push_scope_group(
+                &mut items,
+                &mut paths,
+                &mut bodies,
+                &format!("Project ({})", proj.len()),
+                proj_entries,
+            );
+            push_scope_group(
+                &mut items,
+                &mut paths,
+                &mut bodies,
+                &format!("User ({})", user.len()),
+                user_entries,
+            );
         }
 
         Panel::Agents => {
-            let proj: Vec<_> = app.data.agents.iter().filter(|a| a.scope == Scope::Project).collect();
-            let user: Vec<_> = app.data.agents.iter().filter(|a| a.scope == Scope::User).collect();
+            let proj: Vec<_> = app
+                .data
+                .agents
+                .iter()
+                .filter(|a| a.scope == Scope::Project)
+                .collect();
+            let user: Vec<_> = app
+                .data
+                .agents
+                .iter()
+                .filter(|a| a.scope == Scope::User)
+                .collect();
             let proj_entries: Vec<ItemRow> = proj
                 .iter()
                 .filter(|a| matches(&a.name) || matches(&a.description))
@@ -136,41 +201,65 @@ pub(crate) fn build_detail_items(
                 .filter(|a| matches(&a.name) || matches(&a.description))
                 .map(|a| (agent_item(a), Some(a.path.clone()), Some(a.body.clone())))
                 .collect();
-            push_scope_group(&mut items, &mut paths, &mut bodies, &format!("Project ({})", proj.len()), proj_entries);
-            push_scope_group(&mut items, &mut paths, &mut bodies, &format!("User ({})", user.len()), user_entries);
+            push_scope_group(
+                &mut items,
+                &mut paths,
+                &mut bodies,
+                &format!("Project ({})", proj.len()),
+                proj_entries,
+            );
+            push_scope_group(
+                &mut items,
+                &mut paths,
+                &mut bodies,
+                &format!("User ({})", user.len()),
+                user_entries,
+            );
         }
 
         Panel::Mcp => {
-                let proj_entries: Vec<ItemRow> = app
-                    .data
-                    .mcp
-                    .project
-                    .iter()
-                    .filter(|s| matches(&s.name))
-                    .map(|s| (mcp_item(s), Some(PathBuf::from(format!("{}:{}", "project", s.name))), Some(s.preview_body("project"))))
-                    .collect();
-                let user_entries: Vec<ItemRow> = app
-                    .data
-                    .mcp
-                    .user
-                    .iter()
-                    .filter(|s| matches(&s.name))
-                    .map(|s| (mcp_item(s), Some(PathBuf::from(format!("{}:{}", "user", s.name))), Some(s.preview_body("user"))))
-                    .collect();
-                push_scope_group(
-                    &mut items,
-                    &mut paths,
-                    &mut bodies,
-                    &format!("Project ({})", app.data.mcp.project.len()),
-                    proj_entries,
-                );
-                push_scope_group(
-                    &mut items,
-                    &mut paths,
-                    &mut bodies,
-                    &format!("User ({})", app.data.mcp.user.len()),
-                    user_entries,
-                );
+            let proj_entries: Vec<ItemRow> = app
+                .data
+                .mcp
+                .project
+                .iter()
+                .filter(|s| matches(&s.name))
+                .map(|s| {
+                    (
+                        mcp_item(s),
+                        Some(PathBuf::from(format!("{}:{}", "project", s.name))),
+                        Some(s.preview_body("project")),
+                    )
+                })
+                .collect();
+            let user_entries: Vec<ItemRow> = app
+                .data
+                .mcp
+                .user
+                .iter()
+                .filter(|s| matches(&s.name))
+                .map(|s| {
+                    (
+                        mcp_item(s),
+                        Some(PathBuf::from(format!("{}:{}", "user", s.name))),
+                        Some(s.preview_body("user")),
+                    )
+                })
+                .collect();
+            push_scope_group(
+                &mut items,
+                &mut paths,
+                &mut bodies,
+                &format!("Project ({})", app.data.mcp.project.len()),
+                proj_entries,
+            );
+            push_scope_group(
+                &mut items,
+                &mut paths,
+                &mut bodies,
+                &format!("User ({})", app.data.mcp.user.len()),
+                user_entries,
+            );
         }
 
         Panel::Settings => {
@@ -196,7 +285,10 @@ pub(crate) fn build_detail_items(
                             Style::default().fg(Color::Cyan),
                         ),
                     ])));
-                    paths.push(Some(PathBuf::from(format!("perm:allow:{}:{}", rule.scope, i))));
+                    paths.push(Some(PathBuf::from(format!(
+                        "perm:allow:{}:{}",
+                        rule.scope, i
+                    ))));
                     bodies.push(Some(format!(
                         "# Allow Permission\n\nRule: {}\nScope: {}\n\n---\n\nThis rule is defined in the {} settings.",
                         rule.rule, rule.scope, rule.scope
@@ -206,9 +298,7 @@ pub(crate) fn build_detail_items(
             if !perms.deny.is_empty() {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  Deny",
-                    Style::default()
-                        .fg(Color::Red)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
                 ))));
                 paths.push(None);
                 bodies.push(None);
@@ -224,7 +314,10 @@ pub(crate) fn build_detail_items(
                             Style::default().fg(Color::Red),
                         ),
                     ])));
-                    paths.push(Some(PathBuf::from(format!("perm:deny:{}:{}", rule.scope, i))));
+                    paths.push(Some(PathBuf::from(format!(
+                        "perm:deny:{}:{}",
+                        rule.scope, i
+                    ))));
                     bodies.push(Some(format!(
                         "# Deny Permission\n\nRule: {}\nScope: {}\n\n---\n\nThis rule is defined in the {} settings.",
                         rule.rule, rule.scope, rule.scope
@@ -267,7 +360,12 @@ pub(crate) fn build_detail_items(
                     paths.push(None);
                     bodies.push(Some(format!(
                         "# Hook: {}\n\nEvent: {}\nMatcher: {}\nCommand: {}\nType: {}\nScope: {}",
-                        hook.command, hook.event, hook.matcher, hook.command, hook.hook_type, hook.scope
+                        hook.command,
+                        hook.event,
+                        hook.matcher,
+                        hook.command,
+                        hook.hook_type,
+                        hook.scope
                     )));
                 }
             }
@@ -307,7 +405,13 @@ pub(crate) fn build_detail_items(
                     paths.push(None);
                     bodies.push(Some(format!(
                         "# Keybinding\n\nKey: {}\nCommand: {}\nContext: {}",
-                        b.key, b.command, if b.context.is_empty() { "(global)" } else { &b.context }
+                        b.key,
+                        b.command,
+                        if b.context.is_empty() {
+                            "(global)"
+                        } else {
+                            &b.context
+                        }
                     )));
                 }
             }
@@ -347,7 +451,11 @@ pub(crate) fn build_detail_items(
 
                         let body = format!(
                             "# {}\n\nEffective: {}\n\n---\n\nUser: {}\nProject: {}\nLocal: {}",
-                            key, val_str, format_val(user_val), format_val(project_val), format_val(local_val)
+                            key,
+                            val_str,
+                            format_val(user_val),
+                            format_val(project_val),
+                            format_val(local_val)
                         );
 
                         items.push(ListItem::new(Line::from(vec![
@@ -375,10 +483,7 @@ pub(crate) fn build_detail_items(
                 } else {
                     format!("{:.1} MB", session.size as f64 / (1024.0 * 1024.0))
                 };
-                let summary = session
-                    .summary
-                    .as_deref()
-                    .unwrap_or("(no summary)");
+                let summary = session.summary.as_deref().unwrap_or("(no summary)");
                 items.push(ListItem::new(Line::from(vec![
                     Span::styled("  ", Style::default()),
                     Span::styled(
@@ -386,10 +491,7 @@ pub(crate) fn build_detail_items(
                         Style::default().fg(Color::Yellow),
                     ),
                     Span::styled(format!("  {size}"), Style::default().fg(Color::DarkGray)),
-                    Span::styled(
-                        format!("  {summary}"),
-                        Style::default().fg(Color::White),
-                    ),
+                    Span::styled(format!("  {summary}"), Style::default().fg(Color::White)),
                 ])));
                 paths.push(Some(session.path.clone()));
                 bodies.push(None);
@@ -443,70 +545,101 @@ pub(crate) fn build_detail_items(
         }
 
         Panel::Plugins => {
-                let p = &app.data.plugins;
-                if !p.installed.is_empty() {
-                    items.push(ListItem::new(Line::from(Span::styled(
-                        "  Installed",
-                        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
-                    ))));
-                    paths.push(None);
-                    bodies.push(None);
-                    for plugin in &p.installed {
-                        if !matches(&plugin.name) { continue; }
-                        items.push(ListItem::new(Line::from(vec![
-                            Span::styled("    \u{25cf} ", Style::default().fg(Color::Green)),
-                            Span::styled(plugin.name.clone(), Style::default().fg(Color::White)),
-                            Span::styled(format!("  v{}", plugin.version), Style::default().fg(Color::Cyan)),
-                            Span::styled(format!("  [{}]", plugin.scope), Style::default().fg(Color::DarkGray)),
-                        ])));
-                        paths.push(Some(PathBuf::from(format!("plugin:installed:{}", plugin.name))));
-                        bodies.push(Some(plugin.preview_body()));
+            let p = &app.data.plugins;
+            if !p.installed.is_empty() {
+                items.push(ListItem::new(Line::from(Span::styled(
+                    "  Installed",
+                    Style::default()
+                        .fg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                ))));
+                paths.push(None);
+                bodies.push(None);
+                for plugin in &p.installed {
+                    if !matches(&plugin.name) {
+                        continue;
                     }
-                }
-                if !p.blocked.is_empty() {
-                    items.push(ListItem::new(Line::from(Span::styled(
-                        "  Blocked",
-                        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                    items.push(ListItem::new(Line::from(vec![
+                        Span::styled("    \u{25cf} ", Style::default().fg(Color::Green)),
+                        Span::styled(plugin.name.clone(), Style::default().fg(Color::White)),
+                        Span::styled(
+                            format!("  v{}", plugin.version),
+                            Style::default().fg(Color::Cyan),
+                        ),
+                        Span::styled(
+                            format!("  [{}]", plugin.scope),
+                            Style::default().fg(Color::DarkGray),
+                        ),
+                    ])));
+                    paths.push(Some(PathBuf::from(format!(
+                        "plugin:installed:{}",
+                        plugin.name
                     ))));
-                    paths.push(None);
-                    bodies.push(None);
-                    for plugin in &p.blocked {
-                        if !matches(&plugin.name) { continue; }
-                        items.push(ListItem::new(Line::from(vec![
-                            Span::styled("    \u{25cf} ", Style::default().fg(Color::Red)),
-                            Span::styled(plugin.name.clone(), Style::default().fg(Color::DarkGray)),
-                            Span::styled(format!("  {}", plugin.reason), Style::default().fg(Color::Red)),
-                        ])));
-                        paths.push(Some(PathBuf::from(format!("plugin:blocked:{}", plugin.name))));
-                        bodies.push(Some(plugin.preview_body()));
+                    bodies.push(Some(plugin.preview_body()));
+                }
+            }
+            if !p.blocked.is_empty() {
+                items.push(ListItem::new(Line::from(Span::styled(
+                    "  Blocked",
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ))));
+                paths.push(None);
+                bodies.push(None);
+                for plugin in &p.blocked {
+                    if !matches(&plugin.name) {
+                        continue;
                     }
-                }
-                if !p.marketplaces.is_empty() {
-                    items.push(ListItem::new(Line::from(Span::styled(
-                        "  Marketplaces",
-                        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                    items.push(ListItem::new(Line::from(vec![
+                        Span::styled("    \u{25cf} ", Style::default().fg(Color::Red)),
+                        Span::styled(plugin.name.clone(), Style::default().fg(Color::DarkGray)),
+                        Span::styled(
+                            format!("  {}", plugin.reason),
+                            Style::default().fg(Color::Red),
+                        ),
+                    ])));
+                    paths.push(Some(PathBuf::from(format!(
+                        "plugin:blocked:{}",
+                        plugin.name
                     ))));
-                    paths.push(None);
-                    bodies.push(None);
-                    for mp in &p.marketplaces {
-                        if !matches(&mp.name) { continue; }
-                        items.push(ListItem::new(Line::from(vec![
-                            Span::styled("    ", Style::default()),
-                            Span::styled(mp.name.clone(), Style::default().fg(Color::Yellow)),
-                            Span::styled(format!("  {}", mp.repo), Style::default().fg(Color::DarkGray)),
-                        ])));
-                        paths.push(Some(PathBuf::from(format!("plugin:marketplace:{}", mp.name))));
-                        bodies.push(Some(mp.preview_body()));
+                    bodies.push(Some(plugin.preview_body()));
+                }
+            }
+            if !p.marketplaces.is_empty() {
+                items.push(ListItem::new(Line::from(Span::styled(
+                    "  Marketplaces",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ))));
+                paths.push(None);
+                bodies.push(None);
+                for mp in &p.marketplaces {
+                    if !matches(&mp.name) {
+                        continue;
                     }
-                }
-                if p.installed.is_empty() && p.blocked.is_empty() && p.marketplaces.is_empty() {
-                    items.push(ListItem::new(Line::from(Span::styled(
-                        "  No plugins",
-                        Style::default().fg(Color::DarkGray),
+                    items.push(ListItem::new(Line::from(vec![
+                        Span::styled("    ", Style::default()),
+                        Span::styled(mp.name.clone(), Style::default().fg(Color::Yellow)),
+                        Span::styled(
+                            format!("  {}", mp.repo),
+                            Style::default().fg(Color::DarkGray),
+                        ),
+                    ])));
+                    paths.push(Some(PathBuf::from(format!(
+                        "plugin:marketplace:{}",
+                        mp.name
                     ))));
-                    paths.push(None);
-                    bodies.push(None);
+                    bodies.push(Some(mp.preview_body()));
                 }
+            }
+            if p.installed.is_empty() && p.blocked.is_empty() && p.marketplaces.is_empty() {
+                items.push(ListItem::new(Line::from(Span::styled(
+                    "  No plugins",
+                    Style::default().fg(Color::DarkGray),
+                ))));
+                paths.push(None);
+                bodies.push(None);
+            }
         }
     }
 

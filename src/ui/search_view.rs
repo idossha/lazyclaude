@@ -10,7 +10,11 @@ use crate::app::SearchSource;
 
 use super::markdown::render_markdown;
 
-pub(crate) fn render_search_overlay(frame: &mut Frame, overlay: &crate::app::SearchOverlay, area: Rect) {
+pub(crate) fn render_search_overlay(
+    frame: &mut Frame,
+    overlay: &crate::app::SearchOverlay,
+    area: Rect,
+) {
     let source_label = match overlay.source {
         SearchSource::Skills => "Skills Registry (anthropics/skills)",
         SearchSource::Mcp => "MCP Registry (npm)",
@@ -18,11 +22,7 @@ pub(crate) fn render_search_overlay(frame: &mut Frame, overlay: &crate::app::Sea
     };
 
     // Split: filter bar (3 rows with border) + content area
-    let chunks = Layout::vertical([
-        Constraint::Length(3),
-        Constraint::Min(1),
-    ])
-    .split(area);
+    let chunks = Layout::vertical([Constraint::Length(3), Constraint::Min(1)]).split(area);
 
     // Filter bar
     let filter_display = if overlay.filter.is_empty() {
@@ -47,11 +47,9 @@ pub(crate) fn render_search_overlay(frame: &mut Frame, overlay: &crate::app::Sea
     frame.render_widget(filter_paragraph, chunks[0]);
 
     // Items + Preview split
-    let content_chunks = Layout::horizontal([
-        Constraint::Percentage(40),
-        Constraint::Percentage(60),
-    ])
-    .split(chunks[1]);
+    let content_chunks =
+        Layout::horizontal([Constraint::Percentage(40), Constraint::Percentage(60)])
+            .split(chunks[1]);
 
     // Build filtered item list
     let filtered = overlay.filtered_indices();
@@ -59,11 +57,7 @@ pub(crate) fn render_search_overlay(frame: &mut Frame, overlay: &crate::app::Sea
         .iter()
         .map(|&i| {
             let item = &overlay.all_items[i];
-            let installed_marker = if item.installed {
-                " \u{2714}"
-            } else {
-                ""
-            };
+            let installed_marker = if item.installed { " \u{2714}" } else { "" };
             let name_color = if item.installed {
                 Color::DarkGray
             } else {
@@ -91,9 +85,7 @@ pub(crate) fn render_search_overlay(frame: &mut Frame, overlay: &crate::app::Sea
 
     let mut list_state = ListState::default();
     if !filtered.is_empty() {
-        list_state.select(Some(
-            overlay.selected.min(filtered.len().saturating_sub(1)),
-        ));
+        list_state.select(Some(overlay.selected.min(filtered.len().saturating_sub(1))));
     }
 
     let list_border = if !overlay.preview_focused {
@@ -132,7 +124,10 @@ pub(crate) fn render_search_overlay(frame: &mut Frame, overlay: &crate::app::Sea
     let preview_block = Block::default()
         .borders(Borders::LEFT)
         .border_style(Style::default().fg(preview_border))
-        .title(Span::styled(preview_title, Style::default().fg(preview_border)));
+        .title(Span::styled(
+            preview_title,
+            Style::default().fg(preview_border),
+        ));
     let preview_inner = preview_block.inner(content_chunks[1]);
     frame.render_widget(preview_block, content_chunks[1]);
 

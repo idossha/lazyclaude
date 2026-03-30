@@ -54,10 +54,7 @@ pub fn load(paths: &Paths) -> StatsData {
     } else {
         raw_first.to_string()
     };
-    let last_computed_date = json["lastComputedDate"]
-        .as_str()
-        .unwrap_or("")
-        .to_string();
+    let last_computed_date = json["lastComputedDate"].as_str().unwrap_or("").to_string();
 
     let daily_activity = json["dailyActivity"]
         .as_array()

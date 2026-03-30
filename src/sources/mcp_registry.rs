@@ -46,7 +46,10 @@ impl RegistryEntry {
             lines.push(format!("Author: {}", self.author));
         }
         if !self.date.is_empty() {
-            lines.push(format!("Published: {}", &self.date[..self.date.len().min(10)]));
+            lines.push(format!(
+                "Published: {}",
+                &self.date[..self.date.len().min(10)]
+            ));
         }
         lines.push(format!("Registry: {}", self.registry));
 
@@ -63,9 +66,8 @@ impl RegistryEntry {
         lines.push(String::new());
 
         // Links
-        let has_links = !self.npm_url.is_empty()
-            || !self.homepage.is_empty()
-            || !self.repository.is_empty();
+        let has_links =
+            !self.npm_url.is_empty() || !self.homepage.is_empty() || !self.repository.is_empty();
         if has_links {
             lines.push("---".to_string());
             lines.push(String::new());
@@ -118,7 +120,7 @@ impl RegistryEntry {
 
 /// Render a score (0.0–1.0) as a visual bar.
 fn score_bar(score: f64) -> String {
-    let filled = (score * 10.0).round().min(10.0).max(0.0) as usize;
+    let filled = (score * 10.0).round().clamp(0.0, 10.0) as usize;
     let empty = 10 - filled.min(10);
     format!(
         "{}{} {:.0}%",
@@ -206,9 +208,7 @@ pub fn search_npm(query: &str) -> Result<Vec<RegistryEntry>, String> {
         .into_iter()
         .map(|obj| {
             let pkg = obj.package;
-            let score_detail = obj
-                .score
-                .and_then(|s| s.detail);
+            let score_detail = obj.score.and_then(|s| s.detail);
             let author = pkg
                 .author
                 .and_then(|a| a.name)
@@ -228,10 +228,7 @@ pub fn search_npm(query: &str) -> Result<Vec<RegistryEntry>, String> {
                 author,
                 date: pkg.date.unwrap_or_default(),
                 keywords: pkg.keywords.unwrap_or_default(),
-                score_quality: score_detail
-                    .as_ref()
-                    .and_then(|d| d.quality)
-                    .unwrap_or(0.0),
+                score_quality: score_detail.as_ref().and_then(|d| d.quality).unwrap_or(0.0),
                 score_popularity: score_detail
                     .as_ref()
                     .and_then(|d| d.popularity)

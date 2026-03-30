@@ -9,23 +9,23 @@ pub(crate) fn render_markdown(content: &str) -> Vec<Line<'static>> {
     for raw_line in content.lines() {
         let trimmed = raw_line.trim_start();
 
-        if trimmed.starts_with("# ") {
+        if let Some(rest) = trimmed.strip_prefix("# ") {
             lines.push(Line::from(Span::styled(
-                format!(" {}", &trimmed[2..]),
+                format!(" {}", rest),
                 Style::default()
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD),
             )));
-        } else if trimmed.starts_with("## ") {
+        } else if let Some(rest) = trimmed.strip_prefix("## ") {
             lines.push(Line::from(Span::styled(
-                format!(" {}", &trimmed[3..]),
+                format!(" {}", rest),
                 Style::default()
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::BOLD),
             )));
-        } else if trimmed.starts_with("### ") {
+        } else if let Some(rest) = trimmed.strip_prefix("### ") {
             lines.push(Line::from(Span::styled(
-                format!(" {}", &trimmed[4..]),
+                format!(" {}", rest),
                 Style::default().fg(Color::Yellow),
             )));
         } else if trimmed.starts_with("---") && trimmed.chars().all(|c| c == '-') {
@@ -37,10 +37,7 @@ pub(crate) fn render_markdown(content: &str) -> Vec<Line<'static>> {
             lines.push(Line::from(vec![
                 Span::styled(" ", Style::default()),
                 Span::styled("  ", Style::default().fg(Color::Green)),
-                Span::styled(
-                    trimmed[2..].to_string(),
-                    Style::default().fg(Color::White),
-                ),
+                Span::styled(trimmed[2..].to_string(), Style::default().fg(Color::White)),
             ]));
         } else if trimmed.starts_with("```") {
             lines.push(Line::from(Span::styled(

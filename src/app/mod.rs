@@ -13,35 +13,53 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 
+use crate::ui;
 use lazyclaude::config::Paths;
 use lazyclaude::sources::{self, Scope, SourceData};
-use crate::ui;
 
 // ── Undo support ────────────────────────────────────────────────────────
 
 pub enum UndoAction {
-    DeletedMemory { path: PathBuf, content: String },
-    DeletedSkill { dir_path: PathBuf, files: Vec<(PathBuf, Vec<u8>)> },
-    DeletedAgent { dir_path: PathBuf, files: Vec<(PathBuf, Vec<u8>)> },
-    DeletedMcpServer { scope: Scope, _name: String, config_snapshot: serde_json::Value },
-    DeletedPermission { scope: Scope, kind: String, rule: String, _index: usize },
+    Memory {
+        path: PathBuf,
+        content: String,
+    },
+    Skill {
+        dir_path: PathBuf,
+        files: Vec<(PathBuf, Vec<u8>)>,
+    },
+    Agent {
+        dir_path: PathBuf,
+        files: Vec<(PathBuf, Vec<u8>)>,
+    },
+    McpServer {
+        scope: Scope,
+        _name: String,
+        config_snapshot: serde_json::Value,
+    },
+    Permission {
+        scope: Scope,
+        kind: String,
+        rule: String,
+        _index: usize,
+    },
 }
 
 // ── Panel definitions ─────────────────────────────────────────────────
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Panel {
-    Projects,  // 1
-    Config,    // 2 — CLAUDE.md, rules
-    Memory,    // 3
-    Skills,    // 4
-    Agents,    // 5
-    Mcp,       // 6
-    Settings,  // 7 — permissions, hooks, keybindings combined
-    Sessions,  // 8
-    Stats,     // 9
-    Plugins,   // 0
-    Todos,     // -
+    Projects, // 1
+    Config,   // 2 — CLAUDE.md, rules
+    Memory,   // 3
+    Skills,   // 4
+    Agents,   // 5
+    Mcp,      // 6
+    Settings, // 7 — permissions, hooks, keybindings combined
+    Sessions, // 8
+    Stats,    // 9
+    Plugins,  // 0
+    Todos,    // -
 }
 
 pub const PANELS: &[Panel] = &[
@@ -62,40 +80,48 @@ impl Panel {
     pub fn label(&self) -> &'static str {
         match self {
             Panel::Projects => "Projects",
-            Panel::Config   => "Config",
-            Panel::Memory   => "Memory",
-            Panel::Skills   => "Skills",
-            Panel::Agents   => "Agents",
-            Panel::Mcp      => "MCP",
+            Panel::Config => "Config",
+            Panel::Memory => "Memory",
+            Panel::Skills => "Skills",
+            Panel::Agents => "Agents",
+            Panel::Mcp => "MCP",
             Panel::Settings => "Settings",
             Panel::Sessions => "Sessions",
-            Panel::Stats    => "Stats",
-            Panel::Plugins  => "Plugins",
-            Panel::Todos    => "Todos",
+            Panel::Stats => "Stats",
+            Panel::Plugins => "Plugins",
+            Panel::Todos => "Todos",
         }
     }
 
     pub fn index(&self) -> usize {
         match self {
-            Panel::Projects =>  0,
-            Panel::Config   =>  1,
-            Panel::Memory   =>  2,
-            Panel::Skills   =>  3,
-            Panel::Agents   =>  4,
-            Panel::Mcp      =>  5,
-            Panel::Settings =>  6,
-            Panel::Sessions =>  7,
-            Panel::Stats    =>  8,
-            Panel::Plugins  =>  9,
-            Panel::Todos    => 10,
+            Panel::Projects => 0,
+            Panel::Config => 1,
+            Panel::Memory => 2,
+            Panel::Skills => 3,
+            Panel::Agents => 4,
+            Panel::Mcp => 5,
+            Panel::Settings => 6,
+            Panel::Sessions => 7,
+            Panel::Stats => 8,
+            Panel::Plugins => 9,
+            Panel::Todos => 10,
         }
     }
 
     /// Key label shown in the panel list (1-9, 0, or blank).
     pub fn key_label(&self) -> &'static str {
         match self.index() {
-            0 => "1", 1 => "2", 2 => "3", 3 => "4", 4 => "5",
-            5 => "6", 6 => "7", 7 => "8", 8 => "9", 9 => "0",
+            0 => "1",
+            1 => "2",
+            2 => "3",
+            3 => "4",
+            4 => "5",
+            5 => "6",
+            6 => "7",
+            7 => "8",
+            8 => "9",
+            9 => "0",
             _ => " ",
         }
     }
@@ -110,37 +136,88 @@ impl Panel {
     pub fn count(&self, app: &App) -> usize {
         match self {
             Panel::Projects => app.projects.len() + 1, // +1 for Global
-            Panel::Memory   => app.data.memory.files.len(),
-            Panel::Stats    => 0, // custom dashboard, no list
+            Panel::Memory => app.data.memory.files.len(),
+            Panel::Stats => 0, // custom dashboard, no list
             Panel::Sessions => {
                 let n = app.data.sessions.len();
-                if n == 0 { 1 } else { n } // "No sessions" placeholder
+                if n == 0 {
+                    1
+                } else {
+                    n
+                } // "No sessions" placeholder
             }
             Panel::Todos => {
                 let n = app.data.todos.len();
-                if n == 0 { 1 } else { n }
+                if n == 0 {
+                    1
+                } else {
+                    n
+                }
             }
             Panel::Plugins => {
                 let p = &app.data.plugins;
                 let mut n = 0;
-                if !p.installed.is_empty() { n += 1 + p.installed.len(); }
-                if !p.blocked.is_empty() { n += 1 + p.blocked.len(); }
-                if !p.marketplaces.is_empty() { n += 1 + p.marketplaces.len(); }
-                if n == 0 { 1 } else { n }
+                if !p.installed.is_empty() {
+                    n += 1 + p.installed.len();
+                }
+                if !p.blocked.is_empty() {
+                    n += 1 + p.blocked.len();
+                }
+                if !p.marketplaces.is_empty() {
+                    n += 1 + p.marketplaces.len();
+                }
+                if n == 0 {
+                    1
+                } else {
+                    n
+                }
             }
 
             // Panels using scope groups: header + max(entries, 1 "none" hint) per scope
             Panel::Config => {
-                scope_group_count(app.data.claude_md.iter().filter(|f| f.scope == Scope::Project).count())
-                    + scope_group_count(app.data.claude_md.iter().filter(|f| f.scope == Scope::User).count())
+                scope_group_count(
+                    app.data
+                        .claude_md
+                        .iter()
+                        .filter(|f| f.scope == Scope::Project)
+                        .count(),
+                ) + scope_group_count(
+                    app.data
+                        .claude_md
+                        .iter()
+                        .filter(|f| f.scope == Scope::User)
+                        .count(),
+                )
             }
             Panel::Skills => {
-                scope_group_count(app.data.skills.iter().filter(|s| s.scope == Scope::Project).count())
-                    + scope_group_count(app.data.skills.iter().filter(|s| s.scope == Scope::User).count())
+                scope_group_count(
+                    app.data
+                        .skills
+                        .iter()
+                        .filter(|s| s.scope == Scope::Project)
+                        .count(),
+                ) + scope_group_count(
+                    app.data
+                        .skills
+                        .iter()
+                        .filter(|s| s.scope == Scope::User)
+                        .count(),
+                )
             }
             Panel::Agents => {
-                scope_group_count(app.data.agents.iter().filter(|a| a.scope == Scope::Project).count())
-                    + scope_group_count(app.data.agents.iter().filter(|a| a.scope == Scope::User).count())
+                scope_group_count(
+                    app.data
+                        .agents
+                        .iter()
+                        .filter(|a| a.scope == Scope::Project)
+                        .count(),
+                ) + scope_group_count(
+                    app.data
+                        .agents
+                        .iter()
+                        .filter(|a| a.scope == Scope::User)
+                        .count(),
+                )
             }
             Panel::Mcp => {
                 scope_group_count(app.data.mcp.project.len())
@@ -169,7 +246,8 @@ impl Panel {
                     n += 1 + app.data.keybindings.len();
                 }
                 if let Some(obj) = app.data.settings.effective.as_object() {
-                    let general_count = obj.iter()
+                    let general_count = obj
+                        .iter()
                         .filter(|(k, _)| *k != "permissions" && *k != "hooks")
                         .count();
                     if general_count > 0 {
@@ -201,7 +279,7 @@ pub enum Focus {
 pub enum InputMode {
     Normal,
     Input(InputState),
-    Confirm(ConfirmState),
+    Confirm(Box<ConfirmState>),
 }
 
 pub struct InputState {
@@ -225,16 +303,43 @@ pub enum InputPurpose {
 }
 
 pub enum ConfirmPurpose {
-    DeletePermission { scope: Scope, kind: String, index: usize },
-    DeleteMcpServer { scope: Scope, name: String },
-    DeleteMemory { path: PathBuf, name: String },
-    DeleteSkill { path: PathBuf, name: String },
-    DeleteAgent { path: PathBuf, name: String },
-    DeletePlugin { name: String },
-    UnblockPlugin { name: String },
-    InstallMcpFromRegistry { entry: sources::mcp_registry::RegistryEntry, scope: Scope },
-    InstallPlugin { entry: sources::plugin_registry::PluginEntry },
-    InstallSkillFromRegistry { entry: sources::skills_registry::SkillEntry },
+    DeletePermission {
+        scope: Scope,
+        kind: String,
+        index: usize,
+    },
+    DeleteMcpServer {
+        scope: Scope,
+        name: String,
+    },
+    DeleteMemory {
+        path: PathBuf,
+        name: String,
+    },
+    DeleteSkill {
+        path: PathBuf,
+        name: String,
+    },
+    DeleteAgent {
+        path: PathBuf,
+        name: String,
+    },
+    DeletePlugin {
+        name: String,
+    },
+    UnblockPlugin {
+        name: String,
+    },
+    InstallMcpFromRegistry {
+        entry: sources::mcp_registry::RegistryEntry,
+        scope: Scope,
+    },
+    InstallPlugin {
+        entry: sources::plugin_registry::PluginEntry,
+    },
+    InstallSkillFromRegistry {
+        entry: sources::skills_registry::SkillEntry,
+    },
 }
 
 // ── Search overlay ──────────────────────────────────────────────────────
@@ -271,20 +376,27 @@ impl SearchOverlay {
         use fuzzy_matcher::skim::SkimMatcherV2;
         use fuzzy_matcher::FuzzyMatcher;
         let matcher = SkimMatcherV2::default();
-        let mut indices: Vec<usize> = self.all_items
+        let mut indices: Vec<usize> = self
+            .all_items
             .iter()
             .enumerate()
             .filter(|(_, item)| {
                 self.filter.is_empty()
                     || matcher.fuzzy_match(&item.name, &self.filter).is_some()
-                    || matcher.fuzzy_match(&item.description, &self.filter).is_some()
+                    || matcher
+                        .fuzzy_match(&item.description, &self.filter)
+                        .is_some()
             })
             .map(|(i, _)| i)
             .collect();
         if !self.filter.is_empty() {
             indices.sort_by(|&a, &b| {
-                let score_a = matcher.fuzzy_match(&self.all_items[a].name, &self.filter).unwrap_or(0);
-                let score_b = matcher.fuzzy_match(&self.all_items[b].name, &self.filter).unwrap_or(0);
+                let score_a = matcher
+                    .fuzzy_match(&self.all_items[a].name, &self.filter)
+                    .unwrap_or(0);
+                let score_b = matcher
+                    .fuzzy_match(&self.all_items[b].name, &self.filter)
+                    .unwrap_or(0);
                 score_b.cmp(&score_a) // Higher score first
             });
         }
@@ -347,7 +459,8 @@ pub struct App {
     pub search_overlay: Option<SearchOverlay>,
 
     // Background search (network fetches run off the UI thread)
-    pub search_receiver: Option<mpsc::Receiver<std::result::Result<Vec<SearchOverlayItem>, String>>>,
+    pub search_receiver:
+        Option<mpsc::Receiver<std::result::Result<Vec<SearchOverlayItem>, String>>>,
     pub search_source_pending: Option<SearchSource>,
 
     // Skills registry cache (avoid re-fetching from GitHub)
@@ -406,8 +519,13 @@ impl App {
     }
 
     /// Create a file-system watcher that sends a signal when relevant files change.
-    fn init_watcher(paths: &Paths) -> (Option<notify::RecommendedWatcher>, Option<mpsc::Receiver<()>>) {
-        use notify::{Watcher, RecursiveMode, Config};
+    fn init_watcher(
+        paths: &Paths,
+    ) -> (
+        Option<notify::RecommendedWatcher>,
+        Option<mpsc::Receiver<()>>,
+    ) {
+        use notify::{Config, RecursiveMode, Watcher};
 
         let (watch_tx, watch_rx) = mpsc::channel();
         let watcher = notify::RecommendedWatcher::new(

@@ -8,7 +8,9 @@ impl App {
             }
             InputPurpose::AddPermission { kind } => {
                 if !value.is_empty() {
-                    if let Err(e) = sources::settings::add_permission(&self.paths, "user", &kind, &value) {
+                    if let Err(e) =
+                        sources::settings::add_permission(&self.paths, "user", &kind, &value)
+                    {
                         self.set_message(format!("Error: {e}"));
                     } else {
                         self.set_message(format!("Added {kind}: {value}"));
@@ -27,7 +29,9 @@ impl App {
                     } else {
                         vec![]
                     };
-                    if let Err(e) = sources::mcp::add(&self.paths, scope.as_str(), name, command, &args) {
+                    if let Err(e) =
+                        sources::mcp::add(&self.paths, scope.as_str(), name, command, &args)
+                    {
                         self.set_message(format!("Error: {e}"));
                     } else {
                         self.set_message(format!("Added MCP server: {name}"));
@@ -51,7 +55,10 @@ impl App {
                                 if let Err(e) = std::fs::write(&skill_md, template) {
                                     self.set_message(format!("Error: {}", e));
                                 } else {
-                                    self.set_message(format!("Created skill '{}' — opening editor", value));
+                                    self.set_message(format!(
+                                        "Created skill '{}' — opening editor",
+                                        value
+                                    ));
                                     self.data.skills = sources::skills::load(&self.paths);
                                     self.pending_edit = Some(skill_md);
                                 }
@@ -77,7 +84,10 @@ impl App {
                                 if let Err(e) = std::fs::write(&agent_md, template) {
                                     self.set_message(format!("Error: {}", e));
                                 } else {
-                                    self.set_message(format!("Created agent '{}' — opening editor", value));
+                                    self.set_message(format!(
+                                        "Created agent '{}' — opening editor",
+                                        value
+                                    ));
                                     self.data.agents = sources::agents::load(&self.paths);
                                     self.pending_edit = Some(agent_md);
                                 }
@@ -95,14 +105,23 @@ impl App {
             ConfirmPurpose::DeletePermission { scope, kind, index } => {
                 // Resolve rule text for undo before deleting
                 let perms = &self.data.settings.permissions;
-                let rules = if kind == "allow" { &perms.allow } else { &perms.deny };
+                let rules = if kind == "allow" {
+                    &perms.allow
+                } else {
+                    &perms.deny
+                };
                 let rule_text = rules.get(index).map(|r| r.rule.clone()).unwrap_or_default();
-                if let Err(e) = sources::settings::remove_permission(&self.paths, scope.as_str(), &kind, index) {
+                if let Err(e) =
+                    sources::settings::remove_permission(&self.paths, scope.as_str(), &kind, index)
+                {
                     tracing::error!("Failed to delete permission: {}", e);
                     self.set_message(format!("Error: {e}"));
                 } else {
-                    self.push_undo(UndoAction::DeletedPermission {
-                        scope, kind: kind.clone(), rule: rule_text, _index: index,
+                    self.push_undo(UndoAction::Permission {
+                        scope,
+                        kind: kind.clone(),
+                        rule: rule_text,
+                        _index: index,
                     });
                     self.set_message("Permission deleted".to_string());
                     self.data.settings = sources::settings::load(&self.paths);
@@ -115,8 +134,10 @@ impl App {
                     tracing::error!("Failed to delete MCP server '{}': {}", name, e);
                     self.set_message(format!("Error: {e}"));
                 } else {
-                    self.push_undo(UndoAction::DeletedMcpServer {
-                        scope, _name: name.clone(), config_snapshot,
+                    self.push_undo(UndoAction::McpServer {
+                        scope,
+                        _name: name.clone(),
+                        config_snapshot,
                     });
                     self.set_message(format!("Deleted: {name}"));
                     self.data.mcp = sources::mcp::load(&self.paths);
@@ -161,7 +182,10 @@ impl App {
                     tracing::error!("Failed to delete memory '{}': {}", name, e);
                     self.set_message(format!("Error: {e}"));
                 } else {
-                    self.push_undo(UndoAction::DeletedMemory { path: path.clone(), content });
+                    self.push_undo(UndoAction::Memory {
+                        path: path.clone(),
+                        content,
+                    });
                     self.set_message(format!("Deleted: {name}"));
                     self.data.memory = sources::memory::load(&self.paths);
                 }
@@ -184,7 +208,10 @@ impl App {
                     self.set_message(format!("Error: {e}"));
                 } else {
                     if let Some(dir) = dir_path {
-                        self.push_undo(UndoAction::DeletedSkill { dir_path: dir, files: saved_files });
+                        self.push_undo(UndoAction::Skill {
+                            dir_path: dir,
+                            files: saved_files,
+                        });
                     }
                     self.set_message(format!("Deleted: {name}"));
                     self.data.skills = sources::skills::load(&self.paths);
@@ -208,7 +235,10 @@ impl App {
                     self.set_message(format!("Error: {e}"));
                 } else {
                     if let Some(dir) = dir_path {
-                        self.push_undo(UndoAction::DeletedAgent { dir_path: dir, files: saved_files });
+                        self.push_undo(UndoAction::Agent {
+                            dir_path: dir,
+                            files: saved_files,
+                        });
                     }
                     self.set_message(format!("Deleted: {name}"));
                     self.data.agents = sources::agents::load(&self.paths);
@@ -260,7 +290,9 @@ impl App {
                     prompt: "Allow permission".to_string(),
                     value: String::new(),
                     cursor: 0,
-                    purpose: InputPurpose::AddPermission { kind: "allow".to_string() },
+                    purpose: InputPurpose::AddPermission {
+                        kind: "allow".to_string(),
+                    },
                 });
             }
             Panel::Mcp => {
@@ -268,7 +300,9 @@ impl App {
                     prompt: "Add server (name command args...)".to_string(),
                     value: String::new(),
                     cursor: 0,
-                    purpose: InputPurpose::AddMcpServer { scope: sources::Scope::User },
+                    purpose: InputPurpose::AddMcpServer {
+                        scope: sources::Scope::User,
+                    },
                 });
             }
             Panel::Skills => {
@@ -295,22 +329,22 @@ impl App {
         match self.active_panel {
             Panel::Settings => {
                 if let Some((kind, scope, rule_index, rule_text)) = self.resolve_permission() {
-                    self.input_mode = InputMode::Confirm(ConfirmState {
+                    self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
                         message: format!("Delete {kind} rule '{rule_text}'?"),
                         purpose: ConfirmPurpose::DeletePermission {
                             scope,
                             kind,
                             index: rule_index,
                         },
-                    });
+                    }));
                 }
             }
             Panel::Mcp => {
                 if let Some((scope, name)) = self.resolve_mcp_server() {
-                    self.input_mode = InputMode::Confirm(ConfirmState {
+                    self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
                         message: format!("Delete MCP server '{name}' from {scope}?"),
                         purpose: ConfirmPurpose::DeleteMcpServer { scope, name },
-                    });
+                    }));
                 } else {
                     self.set_message("No server selected".to_string());
                 }
@@ -318,66 +352,76 @@ impl App {
             Panel::Memory => {
                 let idx = self.panel_offset();
                 if let Some(path) = self.item_paths.get(idx).and_then(|p| p.as_ref()) {
-                    let name = self.data.memory.files.iter()
+                    let name = self
+                        .data
+                        .memory
+                        .files
+                        .iter()
                         .find(|f| &f.path == path)
                         .map(|f| f.name.clone())
                         .unwrap_or_else(|| "memory".to_string());
-                    self.input_mode = InputMode::Confirm(ConfirmState {
+                    self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
                         message: format!("Delete memory '{name}'?"),
                         purpose: ConfirmPurpose::DeleteMemory {
                             path: path.clone(),
                             name,
                         },
-                    });
+                    }));
                 }
             }
             Panel::Skills => {
                 let idx = self.panel_offset();
                 if let Some(path) = self.item_paths.get(idx).and_then(|p| p.as_ref()) {
                     // Find the skill name from the bodies/paths
-                    let name = self.data.skills.iter()
+                    let name = self
+                        .data
+                        .skills
+                        .iter()
                         .find(|s| &s.path == path)
                         .map(|s| s.name.clone())
                         .unwrap_or_else(|| "skill".to_string());
-                    self.input_mode = InputMode::Confirm(ConfirmState {
+                    self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
                         message: format!("Delete skill '{name}'?"),
                         purpose: ConfirmPurpose::DeleteSkill {
                             path: path.clone(),
                             name,
                         },
-                    });
+                    }));
                 }
             }
             Panel::Agents => {
                 let idx = self.panel_offset();
                 if let Some(path) = self.item_paths.get(idx).and_then(|p| p.as_ref()) {
-                    let name = self.data.agents.iter()
+                    let name = self
+                        .data
+                        .agents
+                        .iter()
                         .find(|a| &a.path == path)
                         .map(|a| a.name.clone())
                         .unwrap_or_else(|| "agent".to_string());
-                    self.input_mode = InputMode::Confirm(ConfirmState {
+                    self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
                         message: format!("Delete agent '{name}'?"),
                         purpose: ConfirmPurpose::DeleteAgent {
                             path: path.clone(),
                             name,
                         },
-                    });
+                    }));
                 }
             }
             Panel::Plugins => {
                 if let Some((kind, name)) = self.resolve_plugin() {
                     match kind.as_str() {
                         "installed" => {
-                            self.input_mode = InputMode::Confirm(ConfirmState {
+                            self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
                                 message: format!("Remove plugin '{name}'?"),
                                 purpose: ConfirmPurpose::DeletePlugin { name },
-                            });
+                            }));
                         }
                         "blocked" => {
-                            self.input_mode = InputMode::Confirm(ConfirmState {
+                            self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
                                 message: format!("Remove '{name}' from blocklist?"),
                                 purpose: ConfirmPurpose::UnblockPlugin { name },
-                            });
+                            }));
                         }
                         _ => {}
                     }
@@ -425,15 +469,17 @@ impl App {
         };
 
         match json {
-            Ok(text) => {
-                match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(&text)) {
-                    Ok(()) => {
-                        let lines = text.lines().count();
-                        self.set_message(format!("Exported {} panel ({} lines) to clipboard", self.active_panel.label(), lines));
-                    }
-                    Err(e) => self.set_message(format!("Clipboard error: {}", e)),
+            Ok(text) => match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(&text)) {
+                Ok(()) => {
+                    let lines = text.lines().count();
+                    self.set_message(format!(
+                        "Exported {} panel ({} lines) to clipboard",
+                        self.active_panel.label(),
+                        lines
+                    ));
                 }
-            }
+                Err(e) => self.set_message(format!("Clipboard error: {}", e)),
+            },
             Err(e) => self.set_message(format!("Serialize error: {}", e)),
         }
     }
@@ -455,7 +501,7 @@ impl App {
             }
         };
         match action {
-            UndoAction::DeletedMemory { path, content } => {
+            UndoAction::Memory { path, content } => {
                 if let Some(parent) = path.parent() {
                     let _ = std::fs::create_dir_all(parent);
                 }
@@ -467,7 +513,7 @@ impl App {
                     Err(e) => self.set_message(format!("Undo failed: {e}")),
                 }
             }
-            UndoAction::DeletedSkill { dir_path, files } => {
+            UndoAction::Skill { dir_path, files } => {
                 let _ = std::fs::create_dir_all(&dir_path);
                 for (file_path, data) in &files {
                     let _ = std::fs::write(file_path, data);
@@ -475,7 +521,7 @@ impl App {
                 self.set_message("Undo: restored skill".to_string());
                 self.data.skills = sources::skills::load(&self.paths);
             }
-            UndoAction::DeletedAgent { dir_path, files } => {
+            UndoAction::Agent { dir_path, files } => {
                 let _ = std::fs::create_dir_all(&dir_path);
                 for (file_path, data) in &files {
                     let _ = std::fs::write(file_path, data);
@@ -483,7 +529,11 @@ impl App {
                 self.set_message("Undo: restored agent".to_string());
                 self.data.agents = sources::agents::load(&self.paths);
             }
-            UndoAction::DeletedMcpServer { scope, _name: _, config_snapshot } => {
+            UndoAction::McpServer {
+                scope,
+                _name: _,
+                config_snapshot,
+            } => {
                 let mcp_path = self.paths.mcp_path(scope.as_str());
                 match sources::write_json(&mcp_path, &config_snapshot) {
                     Ok(()) => {
@@ -493,7 +543,9 @@ impl App {
                     Err(e) => self.set_message(format!("Undo failed: {e}")),
                 }
             }
-            UndoAction::DeletedPermission { scope, kind, rule, .. } => {
+            UndoAction::Permission {
+                scope, kind, rule, ..
+            } => {
                 match sources::settings::add_permission(&self.paths, scope.as_str(), &kind, &rule) {
                     Ok(()) => {
                         self.set_message(format!("Undo: restored {} permission", kind));
@@ -508,32 +560,40 @@ impl App {
     pub(super) fn action_copy(&mut self) {
         let idx = self.panel_offset();
         let text = match self.active_panel {
-            Panel::Config | Panel::Memory | Panel::Skills | Panel::Agents => {
-                self.item_paths.get(idx).and_then(|p| p.as_ref()).map(|p| p.to_string_lossy().to_string())
-            }
+            Panel::Config | Panel::Memory | Panel::Skills | Panel::Agents => self
+                .item_paths
+                .get(idx)
+                .and_then(|p| p.as_ref())
+                .map(|p| p.to_string_lossy().to_string()),
             Panel::Mcp => {
                 // item_paths has "scope:name" synthetic paths
                 self.item_paths.get(idx).and_then(|p| p.as_ref()).map(|p| {
                     let s = p.to_string_lossy();
-                    s.split_once(':').map(|(_, name)| name.to_string()).unwrap_or(s.to_string())
+                    s.split_once(':')
+                        .map(|(_, name)| name.to_string())
+                        .unwrap_or(s.to_string())
                 })
             }
             Panel::Settings => {
                 self.item_paths.get(idx).and_then(|p| p.as_ref()).map(|p| {
                     let s = p.to_string_lossy();
                     // perm:kind:scope:idx:rule format
-                    s.rsplit_once(':').map(|(_, rule)| rule.to_string()).unwrap_or(s.to_string())
+                    s.rsplit_once(':')
+                        .map(|(_, rule)| rule.to_string())
+                        .unwrap_or(s.to_string())
                 })
             }
-            Panel::Sessions => {
-                self.item_paths.get(idx).and_then(|p| p.as_ref()).map(|p| p.to_string_lossy().to_string())
-            }
-            Panel::Plugins => {
-                self.item_paths.get(idx).and_then(|p| p.as_ref()).map(|p| {
-                    let s = p.to_string_lossy();
-                    s.split_once(':').map(|(_, name)| name.to_string()).unwrap_or(s.to_string())
-                })
-            }
+            Panel::Sessions => self
+                .item_paths
+                .get(idx)
+                .and_then(|p| p.as_ref())
+                .map(|p| p.to_string_lossy().to_string()),
+            Panel::Plugins => self.item_paths.get(idx).and_then(|p| p.as_ref()).map(|p| {
+                let s = p.to_string_lossy();
+                s.split_once(':')
+                    .map(|(_, name)| name.to_string())
+                    .unwrap_or(s.to_string())
+            }),
             _ => None,
         };
 

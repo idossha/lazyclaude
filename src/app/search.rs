@@ -43,8 +43,12 @@ impl App {
                 let cache = self.skills_registry_cache.clone();
                 let installed_names: Vec<String> =
                     self.data.skills.iter().map(|s| s.name.clone()).collect();
-                let installed_dirs: Vec<String> =
-                    self.data.skills.iter().map(|s| s.dir_name.clone()).collect();
+                let installed_dirs: Vec<String> = self
+                    .data
+                    .skills
+                    .iter()
+                    .map(|s| s.dir_name.clone())
+                    .collect();
 
                 std::thread::spawn(move || {
                     let entries = match cache {
@@ -91,8 +95,7 @@ impl App {
                         entries
                             .into_iter()
                             .map(|e| {
-                                let installed =
-                                    installed_names.iter().any(|n| n.contains(&e.name));
+                                let installed = installed_names.iter().any(|n| n.contains(&e.name));
                                 let preview = e.preview_body();
                                 SearchOverlayItem {
                                     name: e.name.clone(),
@@ -123,7 +126,10 @@ impl App {
 
         match rx.try_recv() {
             Ok(result) => {
-                let source = self.search_source_pending.take().unwrap_or(SearchSource::Skills);
+                let source = self
+                    .search_source_pending
+                    .take()
+                    .unwrap_or(SearchSource::Skills);
                 self.search_receiver = None;
 
                 match result {
@@ -193,32 +199,32 @@ impl App {
 
         match &item.data {
             SearchItemData::Skill(entry) => {
-                self.input_mode = InputMode::Confirm(ConfirmState {
-                    message: format!("Install skill '{}' — (y)es user / (p)roject scope?", entry.name),
+                self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
+                    message: format!(
+                        "Install skill '{}' — (y)es user / (p)roject scope?",
+                        entry.name
+                    ),
                     purpose: ConfirmPurpose::InstallSkillFromRegistry {
                         entry: entry.clone(),
                     },
-                });
+                }));
             }
             SearchItemData::Mcp(entry) => {
-                self.input_mode = InputMode::Confirm(ConfirmState {
+                self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
                     message: format!("Install '{}' — (y)es user / (p)roject scope?", entry.name),
                     purpose: ConfirmPurpose::InstallMcpFromRegistry {
                         entry: entry.clone(),
                         scope: Scope::User,
                     },
-                });
+                }));
             }
             SearchItemData::Plugin(entry) => {
-                self.input_mode = InputMode::Confirm(ConfirmState {
-                    message: format!(
-                        "Install '{}' from {}? (y/n)",
-                        entry.name, entry.marketplace
-                    ),
+                self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
+                    message: format!("Install '{}' from {}? (y/n)", entry.name, entry.marketplace),
                     purpose: ConfirmPurpose::InstallPlugin {
                         entry: entry.clone(),
                     },
-                });
+                }));
             }
         }
     }
@@ -227,8 +233,13 @@ impl App {
         let plugins_dir = self.paths.claude_dir.join("plugins");
         let entries = sources::plugin_registry::search_local(&plugins_dir, "")?;
 
-        let installed_names: Vec<String> =
-            self.data.plugins.installed.iter().map(|p| p.name.clone()).collect();
+        let installed_names: Vec<String> = self
+            .data
+            .plugins
+            .installed
+            .iter()
+            .map(|p| p.name.clone())
+            .collect();
 
         Ok(entries
             .into_iter()

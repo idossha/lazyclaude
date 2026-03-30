@@ -93,7 +93,10 @@ impl Paths {
         match scope {
             "user" => self.claude_dir.join("settings.json"),
             "project" => self.project_root.join(".claude").join("settings.json"),
-            "local" => self.project_root.join(".claude").join("settings.local.json"),
+            "local" => self
+                .project_root
+                .join(".claude")
+                .join("settings.local.json"),
             _ => self.claude_dir.join("settings.json"),
         }
     }

@@ -76,10 +76,7 @@ fn render_stats_overview(
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::DarkGray))
-        .title(Span::styled(
-            " Overview ",
-            Style::default().fg(Color::Cyan),
-        ));
+        .title(Span::styled(" Overview ", Style::default().fg(Color::Cyan)));
     frame.render_widget(Paragraph::new(lines).block(block), area);
 }
 

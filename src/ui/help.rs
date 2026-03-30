@@ -156,18 +156,14 @@ fn panel_description(panel: Panel) -> Vec<&'static str> {
 
 fn panel_locations(panel: Panel) -> Vec<(&'static str, &'static str)> {
     match panel {
-        Panel::Projects => vec![
-            ("Discovery", "~/.claude/projects/<encoded-path>/"),
-        ],
+        Panel::Projects => vec![("Discovery", "~/.claude/projects/<encoded-path>/")],
         Panel::Config => vec![
             ("User", "~/CLAUDE.md"),
             ("Project", "<project>/CLAUDE.md  or  .claude/CLAUDE.md"),
             ("User rules", "~/.claude/rules/*.md"),
             ("Project rules", "<project>/.claude/rules/*.md"),
         ],
-        Panel::Memory => vec![
-            ("Files", "~/.claude/projects/<path>/memory/*.md"),
-        ],
+        Panel::Memory => vec![("Files", "~/.claude/projects/<path>/memory/*.md")],
         Panel::Skills => vec![
             ("User", "~/.claude/skills/<name>/SKILL.md"),
             ("Project", "<project>/.claude/skills/<name>/SKILL.md"),
@@ -176,30 +172,21 @@ fn panel_locations(panel: Panel) -> Vec<(&'static str, &'static str)> {
             ("User", "~/.claude/agents/<name>/AGENT.md"),
             ("Project", "<project>/.claude/agents/<name>/AGENT.md"),
         ],
-        Panel::Mcp => vec![
-            ("User", "~/.mcp.json"),
-            ("Project", "<project>/.mcp.json"),
-        ],
+        Panel::Mcp => vec![("User", "~/.mcp.json"), ("Project", "<project>/.mcp.json")],
         Panel::Settings => vec![
             ("User", "~/.claude/settings.json"),
             ("Project", "<project>/.claude/settings.json"),
             ("Local", "<project>/.claude/settings.local.json"),
             ("Keybindings", "~/.claude/keybindings.json"),
         ],
-        Panel::Sessions => vec![
-            ("Files", "~/.claude/projects/<path>/*.jsonl"),
-        ],
-        Panel::Stats => vec![
-            ("Cache", "~/.claude/stats-cache.json"),
-        ],
+        Panel::Sessions => vec![("Files", "~/.claude/projects/<path>/*.jsonl")],
+        Panel::Stats => vec![("Cache", "~/.claude/stats-cache.json")],
         Panel::Plugins => vec![
             ("Installed", "~/.claude/plugins/installed_plugins.json"),
             ("Blocked", "~/.claude/plugins/blocklist.json"),
             ("Marketplaces", "~/.claude/plugins/known_marketplaces.json"),
         ],
-        Panel::Todos => vec![
-            ("Files", "~/.claude/todos/*.json"),
-        ],
+        Panel::Todos => vec![("Files", "~/.claude/todos/*.json")],
     }
 }
 
@@ -274,9 +261,7 @@ fn panel_management(panel: Panel) -> Vec<&'static str> {
 
 fn panel_keys(panel: Panel) -> Vec<(&'static str, &'static str)> {
     match panel {
-        Panel::Projects => vec![
-            ("Enter", "Select / switch to project"),
-        ],
+        Panel::Projects => vec![("Enter", "Select / switch to project")],
         Panel::Config => vec![
             ("e", "Edit in $EDITOR"),
             ("y", "Copy to clipboard"),
@@ -323,23 +308,15 @@ fn panel_keys(panel: Panel) -> Vec<(&'static str, &'static str)> {
             ("y", "Copy to clipboard"),
             ("x", "Export panel as JSON"),
         ],
-        Panel::Sessions => vec![
-            ("y", "Copy to clipboard"),
-            ("x", "Export panel as JSON"),
-        ],
-        Panel::Stats => vec![
-            ("R", "Refresh / recompute stats"),
-        ],
+        Panel::Sessions => vec![("y", "Copy to clipboard"), ("x", "Export panel as JSON")],
+        Panel::Stats => vec![("R", "Refresh / recompute stats")],
         Panel::Plugins => vec![
             ("s", "Search plugin marketplace"),
             ("d", "Remove / unblock plugin"),
             ("y", "Copy to clipboard"),
             ("x", "Export panel as JSON"),
         ],
-        Panel::Todos => vec![
-            ("y", "Copy to clipboard"),
-            ("x", "Export panel as JSON"),
-        ],
+        Panel::Todos => vec![("y", "Copy to clipboard"), ("x", "Export panel as JSON")],
     }
 }
 
@@ -361,42 +338,53 @@ fn global_keys() -> Vec<(&'static str, &'static str)> {
 
 fn panel_references(panel: Panel) -> Vec<(&'static str, &'static str)> {
     match panel {
-        Panel::Projects => vec![
-            ("Claude Code", "docs.anthropic.com/en/docs/claude-code/overview"),
-        ],
-        Panel::Config => vec![
-            ("CLAUDE.md", "docs.anthropic.com/en/docs/claude-code/memory#claudemd"),
-        ],
-        Panel::Memory => vec![
-            ("Memory", "docs.anthropic.com/en/docs/claude-code/memory"),
-        ],
+        Panel::Projects => vec![(
+            "Claude Code",
+            "docs.anthropic.com/en/docs/claude-code/overview",
+        )],
+        Panel::Config => vec![(
+            "CLAUDE.md",
+            "docs.anthropic.com/en/docs/claude-code/memory#claudemd",
+        )],
+        Panel::Memory => vec![("Memory", "docs.anthropic.com/en/docs/claude-code/memory")],
         Panel::Skills => vec![
             ("Skills", "docs.anthropic.com/en/docs/claude-code/skills"),
             ("Registry", "github.com/anthropics/skills"),
         ],
-        Panel::Agents => vec![
-            ("Sub-agents", "docs.anthropic.com/en/docs/claude-code/sub-agents"),
-        ],
+        Panel::Agents => vec![(
+            "Sub-agents",
+            "docs.anthropic.com/en/docs/claude-code/sub-agents",
+        )],
         Panel::Mcp => vec![
             ("MCP spec", "modelcontextprotocol.io"),
-            ("Claude + MCP", "docs.anthropic.com/en/docs/claude-code/mcp-servers"),
+            (
+                "Claude + MCP",
+                "docs.anthropic.com/en/docs/claude-code/mcp-servers",
+            ),
         ],
         Panel::Settings => vec![
-            ("Settings", "docs.anthropic.com/en/docs/claude-code/settings"),
+            (
+                "Settings",
+                "docs.anthropic.com/en/docs/claude-code/settings",
+            ),
             ("Hooks", "docs.anthropic.com/en/docs/claude-code/hooks"),
         ],
-        Panel::Sessions => vec![
-            ("Claude Code", "docs.anthropic.com/en/docs/claude-code/overview"),
-        ],
-        Panel::Stats => vec![
-            ("Claude Code", "docs.anthropic.com/en/docs/claude-code/overview"),
-        ],
-        Panel::Plugins => vec![
-            ("Claude Code", "docs.anthropic.com/en/docs/claude-code/overview"),
-        ],
-        Panel::Todos => vec![
-            ("Claude Code", "docs.anthropic.com/en/docs/claude-code/overview"),
-        ],
+        Panel::Sessions => vec![(
+            "Claude Code",
+            "docs.anthropic.com/en/docs/claude-code/overview",
+        )],
+        Panel::Stats => vec![(
+            "Claude Code",
+            "docs.anthropic.com/en/docs/claude-code/overview",
+        )],
+        Panel::Plugins => vec![(
+            "Claude Code",
+            "docs.anthropic.com/en/docs/claude-code/overview",
+        )],
+        Panel::Todos => vec![(
+            "Claude Code",
+            "docs.anthropic.com/en/docs/claude-code/overview",
+        )],
     }
 }
 

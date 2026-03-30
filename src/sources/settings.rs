@@ -1,5 +1,7 @@
 use crate::config::Paths;
-use crate::sources::{read_json, write_json, PermissionRule, Permissions, Scope, SettingsData, SettingsScopes};
+use crate::sources::{
+    read_json, write_json, PermissionRule, Permissions, Scope, SettingsData, SettingsScopes,
+};
 
 pub fn load(paths: &Paths) -> SettingsData {
     let user = read_json(&paths.settings_path("user"));
@@ -34,12 +36,7 @@ fn merge_settings(
 fn deep_merge(base: &mut serde_json::Value, overlay: &serde_json::Value) {
     if let (Some(base_obj), Some(overlay_obj)) = (base.as_object_mut(), overlay.as_object()) {
         for (key, value) in overlay_obj {
-            if value.is_object()
-                && base_obj
-                    .get(key)
-                    .map(|v| v.is_object())
-                    .unwrap_or(false)
-            {
+            if value.is_object() && base_obj.get(key).map(|v| v.is_object()).unwrap_or(false) {
                 deep_merge(base_obj.get_mut(key).unwrap(), value);
             } else {
                 base_obj.insert(key.clone(), value.clone());
@@ -120,7 +117,12 @@ pub fn add_permission(paths: &Paths, scope: &str, kind: &str, rule: &str) -> any
 }
 
 /// Remove a permission rule by index from a scope
-pub fn remove_permission(paths: &Paths, scope: &str, kind: &str, index: usize) -> anyhow::Result<()> {
+pub fn remove_permission(
+    paths: &Paths,
+    scope: &str,
+    kind: &str,
+    index: usize,
+) -> anyhow::Result<()> {
     let path = paths.settings_path(scope);
     let mut data = read_json(&path);
 

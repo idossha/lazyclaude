@@ -18,10 +18,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
 
     // Split area into main content + status bar
-    let main_chunks = Layout::vertical([
-        Constraint::Min(1),
-        Constraint::Length(1),
-    ]).split(area);
+    let main_chunks = Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).split(area);
 
     // Outer block (no title_bottom — hints moved to status bar)
     let outer = Block::default()
@@ -111,7 +108,8 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
 
     // Show loading indicator while background search is in progress
     if app.search_receiver.is_some() {
-        let source_label = app.search_source_pending
+        let source_label = app
+            .search_source_pending
             .map(|s| s.label())
             .unwrap_or("...");
         let block = Block::default()
@@ -185,9 +183,8 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
     let has_preview = app.has_preview();
 
     if has_preview && !items.is_empty() {
-        let chunks =
-            Layout::horizontal([Constraint::Percentage(40), Constraint::Percentage(60)])
-                .split(inner);
+        let chunks = Layout::horizontal([Constraint::Percentage(40), Constraint::Percentage(60)])
+            .split(inner);
 
         let mut list_state = ListState::default();
         list_state.select(Some(app.panel_offset()));
@@ -212,7 +209,9 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
             Color::DarkGray
         };
         let preview_title_style = if preview_focused {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::DarkGray)
         };
@@ -264,14 +263,21 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let project_name = if app.selected_project == 0 {
         "Global".to_string()
     } else {
-        app.projects.get(app.selected_project - 1)
+        app.projects
+            .get(app.selected_project - 1)
             .map(|p| p.short_name.clone())
             .unwrap_or("?".to_string())
     };
 
     let mut left_spans = vec![
-        Span::styled(format!(" {} ", project_name), Style::default().fg(Color::Black).bg(Color::Cyan)),
-        Span::styled(format!(" {} ", panel.label()), Style::default().fg(Color::Cyan)),
+        Span::styled(
+            format!(" {} ", project_name),
+            Style::default().fg(Color::Black).bg(Color::Cyan),
+        ),
+        Span::styled(
+            format!(" {} ", panel.label()),
+            Style::default().fg(Color::Cyan),
+        ),
     ];
 
     if !app.filter.is_empty() {
@@ -296,10 +302,7 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         Panel::Todos => "",
     };
 
-    let right_span = Span::styled(
-        format!("{} ", hints),
-        Style::default().fg(Color::DarkGray),
-    );
+    let right_span = Span::styled(format!("{} ", hints), Style::default().fg(Color::DarkGray));
 
     // Render: left-aligned spans + right-aligned hints
     let left_line = Line::from(left_spans);

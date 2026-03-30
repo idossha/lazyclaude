@@ -37,10 +37,7 @@ fn scan_dir(agents: &mut Vec<Agent>, dir: &std::path::Path, scope: Scope) {
             let (fm, body) = parse_frontmatter(&content);
             agents.push(Agent {
                 path: agent_file,
-                name: fm
-                    .get("name")
-                    .cloned()
-                    .unwrap_or_else(|| dir_name.clone()),
+                name: fm.get("name").cloned().unwrap_or_else(|| dir_name.clone()),
                 description: fm.get("description").cloned().unwrap_or_default(),
                 model: fm.get("model").cloned().unwrap_or_default(),
                 body,

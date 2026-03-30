@@ -8,10 +8,7 @@ pub fn load(paths: &Paths) -> Vec<Keybinding> {
     // Handle both flat array format and nested { bindings: [...] } format
     let items = data
         .as_array()
-        .or_else(|| {
-            data.get("bindings")
-                .and_then(|v| v.as_array())
-        });
+        .or_else(|| data.get("bindings").and_then(|v| v.as_array()));
 
     if let Some(arr) = items {
         for item in arr {

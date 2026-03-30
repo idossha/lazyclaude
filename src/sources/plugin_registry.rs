@@ -135,7 +135,11 @@ pub fn search_local(plugins_dir: &Path, query: &str) -> Result<Vec<PluginEntry>,
         let plugin_dirs = match std::fs::read_dir(&plugins_path) {
             Ok(d) => d,
             Err(e) => {
-                tracing::warn!("Failed to read plugins dir {}: {}", plugins_path.display(), e);
+                tracing::warn!(
+                    "Failed to read plugins dir {}: {}",
+                    plugins_path.display(),
+                    e
+                );
                 continue;
             }
         };
@@ -154,7 +158,11 @@ pub fn search_local(plugins_dir: &Path, query: &str) -> Result<Vec<PluginEntry>,
             let json_str = match std::fs::read_to_string(&json_path) {
                 Ok(s) => s,
                 Err(e) => {
-                    tracing::warn!("Failed to read plugin metadata {}: {}", json_path.display(), e);
+                    tracing::warn!(
+                        "Failed to read plugin metadata {}: {}",
+                        json_path.display(),
+                        e
+                    );
                     continue;
                 }
             };
@@ -167,14 +175,8 @@ pub fn search_local(plugins_dir: &Path, query: &str) -> Result<Vec<PluginEntry>,
                 }
             };
 
-            let name = json["name"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
-            let description = json["description"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
+            let name = json["name"].as_str().unwrap_or_default().to_string();
+            let description = json["description"].as_str().unwrap_or_default().to_string();
 
             // Filter by query
             if !query_lower.is_empty()
@@ -184,10 +186,7 @@ pub fn search_local(plugins_dir: &Path, query: &str) -> Result<Vec<PluginEntry>,
                 continue;
             }
 
-            let version = json["version"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
+            let version = json["version"].as_str().unwrap_or_default().to_string();
             let author = json["author"]["name"]
                 .as_str()
                 .unwrap_or_default()
@@ -202,8 +201,8 @@ pub fn search_local(plugins_dir: &Path, query: &str) -> Result<Vec<PluginEntry>,
             let has_skills = plugin_dir.join("skills").is_dir();
             let has_hooks = plugin_dir.join("hooks").is_dir();
             let has_commands = plugin_dir.join("commands").is_dir();
-            let has_mcp = plugin_dir.join("mcp").is_dir()
-                || plugin_dir.join("mcp-servers").is_dir();
+            let has_mcp =
+                plugin_dir.join("mcp").is_dir() || plugin_dir.join("mcp-servers").is_dir();
 
             results.push(PluginEntry {
                 name,

@@ -37,10 +37,7 @@ fn scan_dir(skills: &mut Vec<Skill>, dir: &std::path::Path, scope: Scope) {
             let (fm, body) = parse_frontmatter(&content);
             skills.push(Skill {
                 path: skill_file,
-                name: fm
-                    .get("name")
-                    .cloned()
-                    .unwrap_or_else(|| dir_name.clone()),
+                name: fm.get("name").cloned().unwrap_or_else(|| dir_name.clone()),
                 description: fm.get("description").cloned().unwrap_or_default(),
                 user_invocable: fm
                     .get("user_invocable")

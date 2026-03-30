@@ -59,7 +59,13 @@ fn parse_scope(path: &PathBuf) -> Vec<McpServer> {
 }
 
 /// Add an MCP server to the specified scope
-pub fn add(paths: &Paths, scope: &str, name: &str, command: &str, args: &[String]) -> anyhow::Result<()> {
+pub fn add(
+    paths: &Paths,
+    scope: &str,
+    name: &str,
+    command: &str,
+    args: &[String],
+) -> anyhow::Result<()> {
     use crate::sources::write_json;
     let path = paths.mcp_path(scope);
     let mut data = read_json(&path);
@@ -88,10 +94,7 @@ pub fn remove(paths: &Paths, scope: &str, name: &str) -> anyhow::Result<()> {
     use crate::sources::write_json;
     let path = paths.mcp_path(scope);
     let mut data = read_json(&path);
-    if let Some(servers) = data
-        .get_mut("mcpServers")
-        .and_then(|v| v.as_object_mut())
-    {
+    if let Some(servers) = data.get_mut("mcpServers").and_then(|v| v.as_object_mut()) {
         servers.remove(name);
     }
     write_json(&path, &data)

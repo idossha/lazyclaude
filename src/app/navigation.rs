@@ -9,8 +9,13 @@ impl App {
     pub fn has_preview(&self) -> bool {
         matches!(
             self.active_panel,
-            Panel::Config | Panel::Memory | Panel::Skills | Panel::Agents
-            | Panel::Mcp | Panel::Plugins | Panel::Settings
+            Panel::Config
+                | Panel::Memory
+                | Panel::Skills
+                | Panel::Agents
+                | Panel::Mcp
+                | Panel::Plugins
+                | Panel::Settings
         )
     }
 

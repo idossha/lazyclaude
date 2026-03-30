@@ -10,7 +10,11 @@ use lazyclaude::config::Paths;
 use lazyclaude::sources;
 
 #[derive(Parser)]
-#[command(name = "lazyclaude", version, about = "A lazygit-inspired TUI for managing Claude Code configuration")]
+#[command(
+    name = "lazyclaude",
+    version,
+    about = "A lazygit-inspired TUI for managing Claude Code configuration"
+)]
 struct Cli {
     /// Dump all configuration as JSON (for scripting / nvim integration)
     #[arg(long)]
@@ -50,8 +54,7 @@ fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_writer(non_blocking)
         .with_env_filter(
-            EnvFilter::try_from_env("LAZYCLAUDE_LOG")
-                .unwrap_or_else(|_| EnvFilter::new("warn")),
+            EnvFilter::try_from_env("LAZYCLAUDE_LOG").unwrap_or_else(|_| EnvFilter::new("warn")),
         )
         .with_ansi(false)
         .init();

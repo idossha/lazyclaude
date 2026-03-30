@@ -114,22 +114,18 @@ impl App {
             }
 
             // Right — navigate focus rightward: Panels -> Detail -> Preview
-            KeyCode::Char('l') => {
-                match self.focus {
-                    Focus::Panels => self.focus = Focus::Detail,
-                    Focus::Detail if self.has_preview() => self.focus = Focus::Preview,
-                    _ => {}
-                }
-            }
+            KeyCode::Char('l') => match self.focus {
+                Focus::Panels => self.focus = Focus::Detail,
+                Focus::Detail if self.has_preview() => self.focus = Focus::Preview,
+                _ => {}
+            },
 
             // Back / left — navigate focus leftward: Preview -> Detail -> Panels
-            KeyCode::Backspace | KeyCode::Char('h') => {
-                match self.focus {
-                    Focus::Preview => self.focus = Focus::Detail,
-                    Focus::Detail => self.focus = Focus::Panels,
-                    Focus::Panels => {}
-                }
-            }
+            KeyCode::Backspace | KeyCode::Char('h') => match self.focus {
+                Focus::Preview => self.focus = Focus::Detail,
+                Focus::Detail => self.focus = Focus::Panels,
+                Focus::Panels => {}
+            },
 
             // Escape
             KeyCode::Esc => {
@@ -143,10 +139,12 @@ impl App {
             }
 
             // Edit in external editor
-            KeyCode::Char('e') if matches!(
-                self.active_panel,
-                Panel::Config | Panel::Memory | Panel::Skills | Panel::Agents
-            ) => {
+            KeyCode::Char('e')
+                if matches!(
+                    self.active_panel,
+                    Panel::Config | Panel::Memory | Panel::Skills | Panel::Agents
+                ) =>
+            {
                 self.action_edit_external();
             }
 
@@ -162,15 +160,19 @@ impl App {
                     prompt: "Deny permission".to_string(),
                     value: String::new(),
                     cursor: 0,
-                    purpose: InputPurpose::AddPermission { kind: "deny".to_string() },
+                    purpose: InputPurpose::AddPermission {
+                        kind: "deny".to_string(),
+                    },
                 });
             }
 
             // Search overlay (Skills, MCP, Plugins)
-            KeyCode::Char('s') if matches!(
-                self.active_panel,
-                Panel::Skills | Panel::Mcp | Panel::Plugins
-            ) => {
+            KeyCode::Char('s')
+                if matches!(
+                    self.active_panel,
+                    Panel::Skills | Panel::Mcp | Panel::Plugins
+                ) =>
+            {
                 self.open_search_overlay();
             }
 
@@ -193,7 +195,9 @@ impl App {
     }
 
     fn handle_input_key(&mut self, key: KeyEvent) {
-        let InputMode::Input(ref mut state) = self.input_mode else { return };
+        let InputMode::Input(ref mut state) = self.input_mode else {
+            return;
+        };
 
         match key.code {
             KeyCode::Enter => {
@@ -206,7 +210,9 @@ impl App {
                 self.input_mode = InputMode::Normal;
             }
             KeyCode::Char(c) => {
-                let byte_pos = state.value.char_indices()
+                let byte_pos = state
+                    .value
+                    .char_indices()
                     .nth(state.cursor)
                     .map(|(i, _)| i)
                     .unwrap_or(state.value.len());
@@ -216,7 +222,9 @@ impl App {
             KeyCode::Backspace => {
                 if state.cursor > 0 {
                     state.cursor -= 1;
-                    let byte_pos = state.value.char_indices()
+                    let byte_pos = state
+                        .value
+                        .char_indices()
                         .nth(state.cursor)
                         .map(|(i, _)| i)
                         .unwrap_or(state.value.len());
@@ -259,7 +267,10 @@ impl App {
                             let skills_dir = self.paths.project_skills_dir();
                             match sources::skills_registry::install_skill(&skills_dir, &entry) {
                                 Ok(()) => {
-                                    self.set_message(format!("Installed to project: {}", entry.name));
+                                    self.set_message(format!(
+                                        "Installed to project: {}",
+                                        entry.name
+                                    ));
                                     self.data.skills = sources::skills::load(&self.paths);
                                     self.search_overlay = None;
                                 }
@@ -268,10 +279,10 @@ impl App {
                         }
                         other => {
                             // Not a scope-selectable confirm, put it back
-                            self.input_mode = InputMode::Confirm(ConfirmState {
+                            self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
                                 message: String::new(),
                                 purpose: other,
-                            });
+                            }));
                         }
                     }
                 }
@@ -284,7 +295,9 @@ impl App {
     }
 
     pub(crate) fn handle_search_overlay_key(&mut self, key: KeyEvent) {
-        let Some(overlay) = self.search_overlay.as_mut() else { return; };
+        let Some(overlay) = self.search_overlay.as_mut() else {
+            return;
+        };
 
         // When preview is focused, j/k scroll the preview
         if overlay.preview_focused {
@@ -348,7 +361,9 @@ impl App {
                 overlay.preview_focused = true;
             }
             KeyCode::Char(c) => {
-                let byte_pos = overlay.filter.char_indices()
+                let byte_pos = overlay
+                    .filter
+                    .char_indices()
                     .nth(overlay.filter_cursor)
                     .map(|(i, _)| i)
                     .unwrap_or(overlay.filter.len());
@@ -360,7 +375,9 @@ impl App {
             KeyCode::Backspace => {
                 if overlay.filter_cursor > 0 {
                     overlay.filter_cursor -= 1;
-                    let byte_pos = overlay.filter.char_indices()
+                    let byte_pos = overlay
+                        .filter
+                        .char_indices()
                         .nth(overlay.filter_cursor)
                         .map(|(i, _)| i)
                         .unwrap_or(overlay.filter.len());

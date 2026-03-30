@@ -65,14 +65,20 @@ fn test_skills_dual_scope() {
 
     assert_eq!(skills.len(), 2, "expected 2 skills, got {}", skills.len());
 
-    let user_skill = skills.iter().find(|s| s.scope == Scope::User).expect("user skill");
+    let user_skill = skills
+        .iter()
+        .find(|s| s.scope == Scope::User)
+        .expect("user skill");
     assert_eq!(user_skill.name, "My Skill");
     assert_eq!(user_skill.description, "A user skill");
     assert!(user_skill.user_invocable);
     assert_eq!(user_skill.dir_name, "my-skill");
     assert_eq!(user_skill.body, "Do things.");
 
-    let proj_skill = skills.iter().find(|s| s.scope == Scope::Project).expect("project skill");
+    let proj_skill = skills
+        .iter()
+        .find(|s| s.scope == Scope::Project)
+        .expect("project skill");
     assert_eq!(proj_skill.name, "Proj Skill");
     assert_eq!(proj_skill.description, "A project skill");
     assert!(!proj_skill.user_invocable);
@@ -141,14 +147,20 @@ fn test_agents_dual_scope() {
 
     assert_eq!(agents.len(), 2, "expected 2 agents, got {}", agents.len());
 
-    let user_agent = agents.iter().find(|a| a.scope == Scope::User).expect("user agent");
+    let user_agent = agents
+        .iter()
+        .find(|a| a.scope == Scope::User)
+        .expect("user agent");
     assert_eq!(user_agent.name, "My Agent");
     assert_eq!(user_agent.description, "A user agent");
     assert_eq!(user_agent.model, "opus");
     assert_eq!(user_agent.dir_name, "my-agent");
     assert_eq!(user_agent.body, "Agent instructions.");
 
-    let proj_agent = agents.iter().find(|a| a.scope == Scope::Project).expect("project agent");
+    let proj_agent = agents
+        .iter()
+        .find(|a| a.scope == Scope::Project)
+        .expect("project agent");
     assert_eq!(proj_agent.name, "Proj Agent");
     assert_eq!(proj_agent.description, "A project agent");
     assert_eq!(proj_agent.model, "sonnet");
@@ -411,13 +423,19 @@ fn test_hooks_three_scopes() {
 
     assert_eq!(hooks.len(), 2, "expected 2 hooks, got {}", hooks.len());
 
-    let user_hook = hooks.iter().find(|h| h.scope == Scope::User).expect("user hook");
+    let user_hook = hooks
+        .iter()
+        .find(|h| h.scope == Scope::User)
+        .expect("user hook");
     assert_eq!(user_hook.event, "PostToolUse");
     assert_eq!(user_hook.matcher, "Bash");
     assert_eq!(user_hook.command, "echo user-hook");
     assert_eq!(user_hook.hook_type, "command");
 
-    let proj_hook = hooks.iter().find(|h| h.scope == Scope::Project).expect("project hook");
+    let proj_hook = hooks
+        .iter()
+        .find(|h| h.scope == Scope::Project)
+        .expect("project hook");
     assert_eq!(proj_hook.event, "PreToolUse");
     assert_eq!(proj_hook.matcher, "Edit");
     assert_eq!(proj_hook.command, "echo project-hook");
@@ -514,7 +532,12 @@ fn test_claude_md_all_locations() {
 
     let files = sources::claude_md::load(&paths);
 
-    assert_eq!(files.len(), 5, "expected 5 claude_md files, got {}", files.len());
+    assert_eq!(
+        files.len(),
+        5,
+        "expected 5 claude_md files, got {}",
+        files.len()
+    );
 
     // Verify scopes
     let project_files: Vec<_> = files.iter().filter(|f| f.scope == Scope::Project).collect();
@@ -523,7 +546,10 @@ fn test_claude_md_all_locations() {
     assert_eq!(user_files.len(), 2, "expected 2 user-scope files");
 
     // Verify file_type tags
-    let claude_md_files: Vec<_> = files.iter().filter(|f| f.file_type == "claude_md").collect();
+    let claude_md_files: Vec<_> = files
+        .iter()
+        .filter(|f| f.file_type == "claude_md")
+        .collect();
     let rule_files: Vec<_> = files.iter().filter(|f| f.file_type == "rule").collect();
     assert_eq!(claude_md_files.len(), 3, "expected 3 claude_md type files");
     assert_eq!(rule_files.len(), 2, "expected 2 rule type files");
@@ -573,7 +599,12 @@ fn test_keybindings_flat_array() {
 
     let bindings = sources::keybindings::load(&paths);
 
-    assert_eq!(bindings.len(), 2, "expected 2 keybindings, got {}", bindings.len());
+    assert_eq!(
+        bindings.len(),
+        2,
+        "expected 2 keybindings, got {}",
+        bindings.len()
+    );
 
     let submit = bindings.iter().find(|b| b.key == "ctrl+s").expect("ctrl+s");
     assert_eq!(submit.command, "submit");
@@ -610,7 +641,12 @@ fn test_keybindings_nested_context_format() {
     );
 
     let bindings = sources::keybindings::load(&paths);
-    assert_eq!(bindings.len(), 3, "expected 3 keybindings, got {}", bindings.len());
+    assert_eq!(
+        bindings.len(),
+        3,
+        "expected 3 keybindings, got {}",
+        bindings.len()
+    );
 
     let chat_bindings: Vec<_> = bindings.iter().filter(|b| b.context == "Chat").collect();
     assert_eq!(chat_bindings.len(), 2);
@@ -711,11 +747,7 @@ fn test_memory_type_defaults_to_user() {
     fs::create_dir_all(&mem_dir).unwrap();
 
     // No "type" in frontmatter
-    fs::write(
-        mem_dir.join("note.md"),
-        "---\nname: Note\n---\nSomething.",
-    )
-    .unwrap();
+    fs::write(mem_dir.join("note.md"), "---\nname: Note\n---\nSomething.").unwrap();
 
     let memory = sources::memory::load(&paths);
     assert_eq!(memory.files.len(), 1);
@@ -802,10 +834,7 @@ fn test_paths_method_consistency() {
         claude_dir.path().join("keybindings.json")
     );
     // MCP paths (user-level is ~/.mcp.json, project-level is <project>/.mcp.json)
-    assert_eq!(
-        paths.mcp_path("user"),
-        paths.home_dir.join(".mcp.json")
-    );
+    assert_eq!(paths.mcp_path("user"), paths.home_dir.join(".mcp.json"));
     assert_eq!(
         paths.mcp_path("project"),
         project_root.path().join(".mcp.json")
@@ -821,7 +850,10 @@ fn test_paths_method_consistency() {
     );
     assert_eq!(
         paths.settings_path("local"),
-        project_root.path().join(".claude").join("settings.local.json")
+        project_root
+            .path()
+            .join(".claude")
+            .join("settings.local.json")
     );
 }
 
@@ -1057,12 +1089,16 @@ fn test_settings_remove_permission() {
     );
 
     // Remove index 1 ("rule2")
-    sources::settings::remove_permission(&paths, "user", "allow", 1)
-        .expect("remove permission");
+    sources::settings::remove_permission(&paths, "user", "allow", 1).expect("remove permission");
 
     let settings = sources::settings::load(&paths);
     assert_eq!(settings.permissions.allow.len(), 2);
-    let rules: Vec<&str> = settings.permissions.allow.iter().map(|r| r.rule.as_str()).collect();
+    let rules: Vec<&str> = settings
+        .permissions
+        .allow
+        .iter()
+        .map(|r| r.rule.as_str())
+        .collect();
     assert!(rules.contains(&"rule1"));
     assert!(rules.contains(&"rule3"));
     assert!(!rules.contains(&"rule2"));
@@ -1393,15 +1429,17 @@ fn test_plugins_install_replaces_existing_user_scope() {
     let paths = make_paths(&claude_dir, &project_root);
 
     // Install v1
-    sources::plugins::install(&paths, "my-plugin", "1.0.0", "mp1")
-        .expect("install v1");
+    sources::plugins::install(&paths, "my-plugin", "1.0.0", "mp1").expect("install v1");
 
     // Install v2 — should replace, not duplicate
-    sources::plugins::install(&paths, "my-plugin", "2.0.0", "mp1")
-        .expect("install v2");
+    sources::plugins::install(&paths, "my-plugin", "2.0.0", "mp1").expect("install v2");
 
     let data = sources::plugins::load(&paths);
-    assert_eq!(data.installed.len(), 1, "should have exactly 1 installation after replacement");
+    assert_eq!(
+        data.installed.len(),
+        1,
+        "should have exactly 1 installation after replacement"
+    );
     assert_eq!(data.installed[0].version, "2.0.0");
 }
 
@@ -1572,12 +1610,20 @@ fn test_plugin_registry_search_local_filters_by_query() {
     // Plugin 1
     let p1 = base.join("marketplaces/mp/plugins/alpha-plugin/.claude-plugin");
     fs::create_dir_all(&p1).unwrap();
-    fs::write(p1.join("plugin.json"), r#"{"name": "alpha-plugin", "description": "First"}"#).unwrap();
+    fs::write(
+        p1.join("plugin.json"),
+        r#"{"name": "alpha-plugin", "description": "First"}"#,
+    )
+    .unwrap();
 
     // Plugin 2
     let p2 = base.join("marketplaces/mp/plugins/beta-tool/.claude-plugin");
     fs::create_dir_all(&p2).unwrap();
-    fs::write(p2.join("plugin.json"), r#"{"name": "beta-tool", "description": "Second"}"#).unwrap();
+    fs::write(
+        p2.join("plugin.json"),
+        r#"{"name": "beta-tool", "description": "Second"}"#,
+    )
+    .unwrap();
 
     // Search for "alpha"
     let results = sources::plugin_registry::search_local(base, "alpha").unwrap();
@@ -1605,7 +1651,8 @@ fn test_plugin_registry_component_detection() {
     fs::write(
         claude_plugin_dir.join("plugin.json"),
         r#"{"name": "full-plugin", "description": "Has everything"}"#,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Create component subdirectories
     fs::create_dir_all(plugin_dir.join("agents")).unwrap();
@@ -1634,7 +1681,8 @@ fn test_plugin_registry_mcp_servers_dir() {
     fs::write(
         claude_plugin_dir.join("plugin.json"),
         r#"{"name": "mcp-plugin", "description": "MCP via mcp-servers dir"}"#,
-    ).unwrap();
+    )
+    .unwrap();
 
     // "mcp-servers" dir also triggers has_mcp
     fs::create_dir_all(plugin_dir.join("mcp-servers")).unwrap();
@@ -1742,7 +1790,8 @@ fn test_plugin_registry_results_sorted_by_name() {
         fs::write(
             p.join("plugin.json"),
             format!(r#"{{"name": "{name}", "description": ""}}"#),
-        ).unwrap();
+        )
+        .unwrap();
     }
 
     let results = sources::plugin_registry::search_local(base, "").unwrap();
@@ -2026,7 +2075,11 @@ fn test_todos_ignores_non_json_files() {
     let todo_dir = claude_dir.path().join("todos");
     fs::create_dir_all(&todo_dir).unwrap();
     fs::write(todo_dir.join("notes.txt"), "not json").unwrap();
-    fs::write(todo_dir.join("valid.json"), r#"[{"id": "1", "content": "ok"}]"#).unwrap();
+    fs::write(
+        todo_dir.join("valid.json"),
+        r#"[{"id": "1", "content": "ok"}]"#,
+    )
+    .unwrap();
 
     let todos = sources::todos::load(&paths);
     assert_eq!(todos.len(), 1);
@@ -2042,7 +2095,11 @@ fn test_todos_invalid_json_file_skipped() {
     let todo_dir = claude_dir.path().join("todos");
     fs::create_dir_all(&todo_dir).unwrap();
     fs::write(todo_dir.join("bad.json"), "not valid json!!!").unwrap();
-    fs::write(todo_dir.join("good.json"), r#"[{"id": "1", "content": "ok"}]"#).unwrap();
+    fs::write(
+        todo_dir.join("good.json"),
+        r#"[{"id": "1", "content": "ok"}]"#,
+    )
+    .unwrap();
 
     let todos = sources::todos::load(&paths);
     assert_eq!(todos.len(), 1);
@@ -2056,8 +2113,16 @@ fn test_todos_multiple_session_files() {
 
     let todo_dir = claude_dir.path().join("todos");
     fs::create_dir_all(&todo_dir).unwrap();
-    fs::write(todo_dir.join("session-a.json"), r#"[{"id": "1", "content": "from A"}]"#).unwrap();
-    fs::write(todo_dir.join("session-b.json"), r#"[{"id": "2", "content": "from B"}]"#).unwrap();
+    fs::write(
+        todo_dir.join("session-a.json"),
+        r#"[{"id": "1", "content": "from A"}]"#,
+    )
+    .unwrap();
+    fs::write(
+        todo_dir.join("session-b.json"),
+        r#"[{"id": "2", "content": "from B"}]"#,
+    )
+    .unwrap();
 
     let todos = sources::todos::load(&paths);
     assert_eq!(todos.len(), 2);
@@ -2092,10 +2157,22 @@ fn test_mcp_registry_popularity_dots() {
         score_maintenance: 0.0,
     };
 
-    assert_eq!(make_entry(0.0).popularity_dots(), "\u{25CB}\u{25CB}\u{25CB}\u{25CB}\u{25CB}");
-    assert_eq!(make_entry(0.15).popularity_dots(), "\u{25CF}\u{25CB}\u{25CB}\u{25CB}\u{25CB}");
-    assert_eq!(make_entry(0.5).popularity_dots(), "\u{25CF}\u{25CF}\u{25CF}\u{25CB}\u{25CB}");
-    assert_eq!(make_entry(1.0).popularity_dots(), "\u{25CF}\u{25CF}\u{25CF}\u{25CF}\u{25CF}");
+    assert_eq!(
+        make_entry(0.0).popularity_dots(),
+        "\u{25CB}\u{25CB}\u{25CB}\u{25CB}\u{25CB}"
+    );
+    assert_eq!(
+        make_entry(0.15).popularity_dots(),
+        "\u{25CF}\u{25CB}\u{25CB}\u{25CB}\u{25CB}"
+    );
+    assert_eq!(
+        make_entry(0.5).popularity_dots(),
+        "\u{25CF}\u{25CF}\u{25CF}\u{25CB}\u{25CB}"
+    );
+    assert_eq!(
+        make_entry(1.0).popularity_dots(),
+        "\u{25CF}\u{25CF}\u{25CF}\u{25CF}\u{25CF}"
+    );
 }
 
 #[test]
@@ -2222,7 +2299,11 @@ fn test_mcp_server_preview_body_basic() {
     let server = sources::McpServer {
         name: "my-server".to_string(),
         command: "node".to_string(),
-        args: vec!["index.js".to_string(), "--port".to_string(), "3000".to_string()],
+        args: vec![
+            "index.js".to_string(),
+            "--port".to_string(),
+            "3000".to_string(),
+        ],
         env: std::collections::HashMap::new(),
         disabled: false,
     };
@@ -2256,7 +2337,10 @@ fn test_mcp_server_preview_body_disabled() {
 fn test_mcp_server_preview_body_truncates_long_env_values() {
     let mut env = std::collections::HashMap::new();
     env.insert("SHORT".to_string(), "abc".to_string());
-    env.insert("LONG_KEY".to_string(), "this_is_a_very_long_value_that_exceeds_20_chars".to_string());
+    env.insert(
+        "LONG_KEY".to_string(),
+        "this_is_a_very_long_value_that_exceeds_20_chars".to_string(),
+    );
 
     let server = sources::McpServer {
         name: "env-server".to_string(),
@@ -2282,7 +2366,10 @@ fn test_parse_frontmatter_colon_in_value() {
     // Values with colons (e.g. URLs) should preserve everything after first colon
     let content = "---\nurl: https://example.com:8080\n---\nBody.";
     let (fm, body) = sources::parse_frontmatter(content);
-    assert_eq!(fm.get("url").map(|s| s.as_str()), Some("https://example.com:8080"));
+    assert_eq!(
+        fm.get("url").map(|s| s.as_str()),
+        Some("https://example.com:8080")
+    );
     assert_eq!(body, "Body.");
 }
 
@@ -2541,11 +2628,7 @@ fn test_plugins_invalid_blocklist_json() {
     let project_root = TempDir::new().unwrap();
     let paths = make_paths(&claude_dir, &project_root);
 
-    write_fixture(
-        claude_dir.path(),
-        "plugins/blocklist.json",
-        "corrupt",
-    );
+    write_fixture(claude_dir.path(), "plugins/blocklist.json", "corrupt");
 
     let data = sources::plugins::load(&paths);
     assert!(data.blocked.is_empty());

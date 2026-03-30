@@ -17,9 +17,7 @@ impl App {
                 .ok();
 
                 // Run editor — blocks until user closes it
-                let _ = std::process::Command::new(&editor)
-                    .arg(&path)
-                    .status();
+                let _ = std::process::Command::new(&editor).arg(&path).status();
 
                 // Return to TUI mode
                 crossterm::execute!(

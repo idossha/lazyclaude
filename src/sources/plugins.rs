@@ -39,7 +39,7 @@ pub struct BlockedPlugin {
 impl BlockedPlugin {
     pub fn preview_body(&self) -> String {
         let mut lines = vec![format!("# {}", self.name), String::new()];
-        lines.push(format!("Status: Blocked"));
+        lines.push("Status: Blocked".to_string());
         if !self.reason.is_empty() {
             lines.push(format!("Reason: {}", self.reason));
         }
@@ -175,7 +175,10 @@ fn epoch_to_date_string() -> String {
 
 /// Remove an installed plugin by name.
 pub fn remove(paths: &Paths, name: &str) -> anyhow::Result<()> {
-    let path = paths.claude_dir.join("plugins").join("installed_plugins.json");
+    let path = paths
+        .claude_dir
+        .join("plugins")
+        .join("installed_plugins.json");
     let mut data = super::read_json(&path);
     if let Some(obj) = data.get_mut("plugins").and_then(|v| v.as_object_mut()) {
         obj.remove(name);
@@ -185,7 +188,10 @@ pub fn remove(paths: &Paths, name: &str) -> anyhow::Result<()> {
 
 /// Install a plugin by recording it in installed_plugins.json.
 pub fn install(paths: &Paths, name: &str, version: &str, marketplace: &str) -> anyhow::Result<()> {
-    let path = paths.claude_dir.join("plugins").join("installed_plugins.json");
+    let path = paths
+        .claude_dir
+        .join("plugins")
+        .join("installed_plugins.json");
     let mut data = super::read_json(&path);
 
     // Ensure top-level structure exists
@@ -227,4 +233,3 @@ pub fn unblock(paths: &Paths, name: &str) -> anyhow::Result<()> {
     }
     super::write_json(&path, &data)
 }
-

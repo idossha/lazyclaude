@@ -44,10 +44,7 @@ fn render_overlay(frame: &mut Frame, app: &App) {
                 .style(Style::default().fg(Color::White));
             frame.render_widget(paragraph, input_area);
 
-            frame.set_cursor_position((
-                input_area.x + 1 + state.cursor as u16,
-                input_area.y + 1,
-            ));
+            frame.set_cursor_position((input_area.x + 1 + state.cursor as u16, input_area.y + 1));
         }
         InputMode::Confirm(state) => {
             let confirm_area = Rect {

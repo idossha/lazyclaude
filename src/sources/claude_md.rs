@@ -26,7 +26,12 @@ pub fn load(paths: &Paths) -> Vec<ClaudeMdFile> {
     scan_rules_dir(&mut files, &rules_dir, Scope::Project);
 
     // User-level CLAUDE.md
-    check_file(&mut files, paths.home_dir.join("CLAUDE.md"), Scope::User, "claude_md");
+    check_file(
+        &mut files,
+        paths.home_dir.join("CLAUDE.md"),
+        Scope::User,
+        "claude_md",
+    );
 
     // User-level rules (~/.claude/rules/*.md)
     let user_rules_dir = paths.claude_dir.join("rules");

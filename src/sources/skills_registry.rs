@@ -83,10 +83,7 @@ pub fn fetch_skills() -> Result<Vec<SkillEntry>, String> {
             "https://raw.githubusercontent.com/anthropics/skills/main/skills/{}/SKILL.md",
             dir_name
         );
-        let skill_md = match ureq::get(&raw_url)
-            .set("User-Agent", "lazyclaude")
-            .call()
-        {
+        let skill_md = match ureq::get(&raw_url).set("User-Agent", "lazyclaude").call() {
             Ok(resp) => resp.into_string().unwrap_or_default(),
             Err(e) => {
                 tracing::warn!("Failed to fetch skill {}: {}", dir_name, e);
