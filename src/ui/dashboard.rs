@@ -644,17 +644,16 @@ fn agent_item(a: &lazyclaude::sources::Agent) -> ListItem<'static> {
 }
 
 fn mcp_item(s: &lazyclaude::sources::McpServer) -> ListItem<'static> {
-    let status = if s.disabled { " (disabled)" } else { "" };
-    let color = if s.disabled {
-        Color::DarkGray
+    let (badge, badge_color, name_color) = if s.disabled {
+        ("  ●", Color::Red, Color::DarkGray)
     } else {
-        Color::Green
+        ("  ●", Color::Green, Color::White)
     };
     let cmd = format!("{} {}", s.command, s.args.join(" "));
     ListItem::new(Line::from(vec![
-        Span::styled("    ", Style::default()),
-        Span::styled(s.name.clone(), Style::default().fg(color)),
-        Span::styled(status.to_string(), Style::default().fg(Color::DarkGray)),
+        Span::styled("   ", Style::default()),
+        Span::styled(badge, Style::default().fg(badge_color)),
+        Span::styled(format!(" {}", s.name), Style::default().fg(name_color)),
         Span::styled(format!("  {cmd}"), Style::default().fg(Color::DarkGray)),
     ]))
 }

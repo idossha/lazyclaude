@@ -176,21 +176,21 @@ fn test_agents_name_defaults_to_dir_name() {
 
 #[test]
 fn test_mcp_dual_scope() {
-    let claude_dir = TempDir::new().unwrap();
+    let wrapper = TempDir::new().unwrap();
     let project_root = TempDir::new().unwrap();
-    let paths = make_paths(&claude_dir, &project_root);
+    let (paths, _claude_dir) = make_nested_paths(&wrapper, &project_root);
 
-    // User-level: ~/.claude/.mcp.json
+    // User-level: ~/.mcp.json (home dir, not inside .claude/)
     write_fixture(
-        claude_dir.path(),
+        wrapper.path(),
         ".mcp.json",
         r#"{"mcpServers": {"user-server": {"command": "node", "args": ["user.js"]}}}"#,
     );
 
-    // Project-level: <project>/.claude/.mcp.json
+    // Project-level: <project>/.mcp.json (project root, not inside .claude/)
     write_fixture(
         project_root.path(),
-        ".claude/.mcp.json",
+        ".mcp.json",
         r#"{"mcpServers": {"proj-server": {"command": "python", "args": ["proj.py"]}}}"#,
     );
 
@@ -211,12 +211,12 @@ fn test_mcp_dual_scope() {
 
 #[test]
 fn test_mcp_disabled_server() {
-    let claude_dir = TempDir::new().unwrap();
+    let wrapper = TempDir::new().unwrap();
     let project_root = TempDir::new().unwrap();
-    let paths = make_paths(&claude_dir, &project_root);
+    let (paths, _claude_dir) = make_nested_paths(&wrapper, &project_root);
 
     write_fixture(
-        claude_dir.path(),
+        wrapper.path(),
         ".mcp.json",
         r#"{"mcpServers": {"off-server": {"command": "node", "args": [], "disabled": true}}}"#,
     );
@@ -228,12 +228,12 @@ fn test_mcp_disabled_server() {
 
 #[test]
 fn test_mcp_with_env() {
-    let claude_dir = TempDir::new().unwrap();
+    let wrapper = TempDir::new().unwrap();
     let project_root = TempDir::new().unwrap();
-    let paths = make_paths(&claude_dir, &project_root);
+    let (paths, _claude_dir) = make_nested_paths(&wrapper, &project_root);
 
     write_fixture(
-        claude_dir.path(),
+        wrapper.path(),
         ".mcp.json",
         r#"{"mcpServers": {"env-server": {"command": "node", "args": ["s.js"], "env": {"API_KEY": "secret123"}}}}"#,
     );
@@ -800,14 +800,14 @@ fn test_paths_method_consistency() {
         paths.keybindings_path(),
         claude_dir.path().join("keybindings.json")
     );
-    // MCP paths
+    // MCP paths (user-level is ~/.mcp.json, project-level is <project>/.mcp.json)
     assert_eq!(
         paths.mcp_path("user"),
-        claude_dir.path().join(".mcp.json")
+        paths.home_dir.join(".mcp.json")
     );
     assert_eq!(
         paths.mcp_path("project"),
-        project_root.path().join(".claude").join(".mcp.json")
+        project_root.path().join(".mcp.json")
     );
     // Settings paths
     assert_eq!(
@@ -855,34 +855,34 @@ fn test_parse_frontmatter_empty_body() {
 
 #[test]
 fn test_load_all_integration() {
-    let claude_dir = TempDir::new().unwrap();
+    let wrapper = TempDir::new().unwrap();
     let project_root = TempDir::new().unwrap();
-    let paths = make_paths(&claude_dir, &project_root);
+    let (paths, claude_dir) = make_nested_paths(&wrapper, &project_root);
 
     // --- Skills ---
     write_fixture(
-        claude_dir.path(),
+        &claude_dir,
         "skills/test-skill/SKILL.md",
         "---\nname: Test Skill\ndescription: test\n---\nBody.",
     );
 
     // --- Agents ---
     write_fixture(
-        claude_dir.path(),
+        &claude_dir,
         "agents/test-agent/AGENT.md",
         "---\nname: Test Agent\ndescription: test agent\nmodel: opus\n---\nAgent body.",
     );
 
-    // --- MCP ---
+    // --- MCP (user-level: ~/.mcp.json, lives in home dir) ---
     write_fixture(
-        claude_dir.path(),
+        wrapper.path(),
         ".mcp.json",
         r#"{"mcpServers": {"test-server": {"command": "node", "args": ["test.js"]}}}"#,
     );
 
     // --- Settings ---
     write_fixture(
-        claude_dir.path(),
+        &claude_dir,
         "settings.json",
         r#"{"permissions": {"allow": ["Bash(echo *)"]}}"#,
     );
@@ -910,7 +910,7 @@ fn test_load_all_integration() {
 
     // --- Keybindings (use nested context format) ---
     write_fixture(
-        claude_dir.path(),
+        &claude_dir,
         "keybindings.json",
         r#"[{"context": "Chat", "bindings": {"ctrl+s": "submit"}}]"#,
     );
@@ -974,9 +974,9 @@ fn test_empty_dirs() {
 
 #[test]
 fn test_mcp_add_and_remove() {
-    let claude_dir = TempDir::new().unwrap();
+    let wrapper = TempDir::new().unwrap();
     let project_root = TempDir::new().unwrap();
-    let paths = make_paths(&claude_dir, &project_root);
+    let (paths, _claude_dir) = make_nested_paths(&wrapper, &project_root);
 
     // Start with empty -- add a server
     sources::mcp::add(
@@ -1001,12 +1001,12 @@ fn test_mcp_add_and_remove() {
 
 #[test]
 fn test_mcp_toggle() {
-    let claude_dir = TempDir::new().unwrap();
+    let wrapper = TempDir::new().unwrap();
     let project_root = TempDir::new().unwrap();
-    let paths = make_paths(&claude_dir, &project_root);
+    let (paths, _claude_dir) = make_nested_paths(&wrapper, &project_root);
 
     write_fixture(
-        claude_dir.path(),
+        wrapper.path(),
         ".mcp.json",
         r#"{"mcpServers": {"s1": {"command": "node", "args": []}}}"#,
     );
@@ -1145,11 +1145,11 @@ fn test_invalid_json_returns_empty() {
 
 #[test]
 fn test_mcp_invalid_json_returns_empty() {
-    let claude_dir = TempDir::new().unwrap();
+    let wrapper = TempDir::new().unwrap();
     let project_root = TempDir::new().unwrap();
-    let paths = make_paths(&claude_dir, &project_root);
+    let (paths, _claude_dir) = make_nested_paths(&wrapper, &project_root);
 
-    write_fixture(claude_dir.path(), ".mcp.json", "broken json!!!");
+    write_fixture(wrapper.path(), ".mcp.json", "broken json!!!");
 
     let mcp = sources::mcp::load(&paths);
     assert!(mcp.user.is_empty());

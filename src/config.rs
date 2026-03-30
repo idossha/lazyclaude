@@ -98,12 +98,14 @@ impl Paths {
         }
     }
 
-    /// MCP config path for a given scope
+    /// MCP config path for a given scope.
+    /// User-level: ~/.mcp.json (standard cross-tool location)
+    /// Project-level: <project>/.mcp.json (project root, not inside .claude/)
     pub fn mcp_path(&self, scope: &str) -> PathBuf {
         match scope {
-            "user" => self.claude_dir.join(".mcp.json"),
-            "project" => self.project_root.join(".claude").join(".mcp.json"),
-            _ => self.claude_dir.join(".mcp.json"),
+            "user" => self.home_dir.join(".mcp.json"),
+            "project" => self.project_root.join(".mcp.json"),
+            _ => self.home_dir.join(".mcp.json"),
         }
     }
 

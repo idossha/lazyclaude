@@ -64,23 +64,83 @@ impl Panel {
         PANELS.get(i).copied()
     }
 
+    /// Returns the number of rendered rows in the detail list.
+    /// This must match what `build_detail_items` produces so j/k can
+    /// reach every row.
     pub fn count(&self, app: &App) -> usize {
         match self {
             Panel::Projects => app.projects.len() + 1, // +1 for Global
-            Panel::Config   => app.data.claude_md.len(),
             Panel::Memory   => app.data.memory.files.len(),
-            Panel::Skills   => app.data.skills.len(),
-            Panel::Agents   => app.data.agents.len(),
-            Panel::Mcp      => app.data.mcp.user.len() + app.data.mcp.project.len(),
-            Panel::Settings => {
-                app.data.settings.permissions.allow.len()
-                    + app.data.settings.permissions.deny.len()
-                    + app.data.hooks.len()
-                    + app.data.keybindings.len()
+            Panel::Sessions => {
+                let n = app.data.sessions.len();
+                if n == 0 { 1 } else { n } // "No sessions" placeholder
             }
-            Panel::Sessions => app.data.sessions.len(),
+
+            // Panels using scope groups: header + max(entries, 1 "none" hint) per scope
+            Panel::Config => {
+                scope_group_count(app.data.claude_md.iter().filter(|f| f.scope == "project").count())
+                    + scope_group_count(app.data.claude_md.iter().filter(|f| f.scope == "user").count())
+            }
+            Panel::Skills => {
+                scope_group_count(app.data.skills.iter().filter(|s| s.scope == "project").count())
+                    + scope_group_count(app.data.skills.iter().filter(|s| s.scope == "user").count())
+            }
+            Panel::Agents => {
+                scope_group_count(app.data.agents.iter().filter(|a| a.scope == "project").count())
+                    + scope_group_count(app.data.agents.iter().filter(|a| a.scope == "user").count())
+            }
+            Panel::Mcp => {
+                if app.mcp_search_active {
+                    app.registry_results.len()
+                } else {
+                    scope_group_count(app.data.mcp.project.len())
+                        + scope_group_count(app.data.mcp.user.len())
+                }
+            }
+            Panel::Settings => {
+                let perms = &app.data.settings.permissions;
+                let mut n = 0;
+                // Allow section
+                if !perms.allow.is_empty() {
+                    n += 1 + perms.allow.len(); // header + items
+                }
+                // Deny section
+                if !perms.deny.is_empty() {
+                    n += 1 + perms.deny.len();
+                }
+                // Hooks section
+                if !app.data.hooks.is_empty() {
+                    n += 1; // "Hooks" header
+                    let mut events = std::collections::HashSet::new();
+                    for h in &app.data.hooks {
+                        if events.insert(&h.event) {
+                            n += 1; // event sub-header
+                        }
+                        n += 1; // hook item
+                    }
+                }
+                // Keybindings section
+                if !app.data.keybindings.is_empty() {
+                    n += 1 + app.data.keybindings.len();
+                }
+                // General settings section
+                if let Some(obj) = app.data.settings.effective.as_object() {
+                    let general_count = obj.iter()
+                        .filter(|(k, _)| *k != "permissions" && *k != "hooks")
+                        .count();
+                    if general_count > 0 {
+                        n += 1 + general_count;
+                    }
+                }
+                n
+            }
         }
     }
+}
+
+/// Number of rendered rows for a scope group: 1 header + max(entries, 1 "none" hint).
+fn scope_group_count(entries: usize) -> usize {
+    1 + if entries == 0 { 1 } else { entries }
 }
 
 // ── Focus ───────────────────────────────────────────────────────────────
@@ -120,6 +180,7 @@ pub enum InputPurpose {
 
 pub enum ConfirmPurpose {
     DeletePermission { scope: String, kind: String, index: usize },
+    DeleteMcpServer { scope: String, name: String },
     InstallMcpFromRegistry { entry: sources::mcp_registry::RegistryEntry, scope: String },
 }
 
@@ -291,17 +352,36 @@ impl App {
                 self.detail_scroll = self.detail_scroll.saturating_sub(3);
             }
 
-            // Navigation within active panel
-            KeyCode::Char('j') | KeyCode::Down => self.move_down(),
-            KeyCode::Char('k') | KeyCode::Up => self.move_up(),
+            // Navigation: panels (left) vs detail (right)
+            KeyCode::Char('j') | KeyCode::Down => {
+                if self.focus == Focus::Panels {
+                    self.move_panel_down();
+                } else {
+                    self.move_down();
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if self.focus == Focus::Panels {
+                    self.move_panel_up();
+                } else {
+                    self.move_up();
+                }
+            }
 
-            // Enter / right — select project or switch to detail
-            KeyCode::Enter | KeyCode::Char('l') => {
+            // Enter — select project or switch to detail
+            KeyCode::Enter => {
                 if self.mcp_search_active {
                     self.action_install_registry_mcp();
-                } else if self.active_panel == Panel::Projects && self.focus == Focus::Panels {
+                } else if self.active_panel == Panel::Projects {
                     self.select_project();
                 } else if self.focus == Focus::Panels {
+                    self.focus = Focus::Detail;
+                }
+            }
+
+            // Right — always navigate focus to detail
+            KeyCode::Char('l') => {
+                if self.focus == Focus::Panels {
                     self.focus = Focus::Detail;
                 }
             }
@@ -497,6 +577,14 @@ impl App {
                     self.data.settings = sources::settings::load(&self.paths);
                 }
             }
+            ConfirmPurpose::DeleteMcpServer { scope, name } => {
+                if let Err(e) = sources::mcp::remove(&self.paths, &scope, &name) {
+                    self.message = Some(format!("Error: {e}"));
+                } else {
+                    self.message = Some(format!("Deleted: {name}"));
+                    self.data.mcp = sources::mcp::load(&self.paths);
+                }
+            }
             ConfirmPurpose::InstallMcpFromRegistry { entry, scope } => {
                 if let Err(e) = sources::mcp::add(
                     &self.paths,
@@ -520,6 +608,22 @@ impl App {
 
     pub fn panel_offset(&self) -> usize {
         self.panel_offsets[self.active_panel.index()]
+    }
+
+    fn move_panel_down(&mut self) {
+        let cur = self.active_panel.index();
+        if cur < PANELS.len() - 1 {
+            self.active_panel = PANELS[cur + 1];
+            self.detail_scroll = 0;
+        }
+    }
+
+    fn move_panel_up(&mut self) {
+        let cur = self.active_panel.index();
+        if cur > 0 {
+            self.active_panel = PANELS[cur - 1];
+            self.detail_scroll = 0;
+        }
     }
 
     fn move_down(&mut self) {
@@ -630,7 +734,14 @@ impl App {
                 }
             }
             Panel::Mcp => {
-                self.message = Some("Position cursor on a server and press 'd'".to_string());
+                if let Some((scope, name)) = self.resolve_mcp_server() {
+                    self.input_mode = InputMode::Confirm(ConfirmState {
+                        message: format!("Delete MCP server '{name}' from {scope}?"),
+                        purpose: ConfirmPurpose::DeleteMcpServer { scope, name },
+                    });
+                } else {
+                    self.message = Some("No server selected".to_string());
+                }
             }
             _ => {}
         }
@@ -649,8 +760,56 @@ impl App {
         }
     }
 
+    /// Resolve the current panel offset to a (scope, server_name) for MCP.
+    /// Returns None if the cursor is on a header or "none" hint.
+    fn resolve_mcp_server(&self) -> Option<(String, String)> {
+        let idx = self.panel_offset();
+        // Layout mirrors build_detail_items for Panel::Mcp:
+        // 0: "Project (N)" header
+        // 1..N: project servers (or 1 "none" hint)
+        // N+1: "User (M)" header
+        // N+2..end: user servers (or 1 "none" hint)
+        let proj_count = self.data.mcp.project.len();
+        let proj_items = if proj_count == 0 { 1 } else { proj_count }; // "none" hint counts as 1
+        let user_count = self.data.mcp.user.len();
+
+        // Project header is index 0
+        // Project items are 1..=proj_items
+        // User header is 1 + proj_items
+        // User items are 2 + proj_items ..
+
+        if idx == 0 {
+            return None; // project header
+        }
+        if idx <= proj_items {
+            if proj_count == 0 { return None; } // "none" hint
+            let server = &self.data.mcp.project[idx - 1];
+            return Some(("project".to_string(), server.name.clone()));
+        }
+        let user_header = 1 + proj_items;
+        if idx == user_header {
+            return None; // user header
+        }
+        let user_offset = idx - user_header - 1;
+        if user_count == 0 { return None; } // "none" hint
+        if user_offset < user_count {
+            let server = &self.data.mcp.user[user_offset];
+            return Some(("user".to_string(), server.name.clone()));
+        }
+        None
+    }
+
     fn action_toggle_mcp(&mut self) {
-        self.message = Some("Toggle: position cursor on server, press 't'".to_string());
+        if let Some((scope, name)) = self.resolve_mcp_server() {
+            if let Err(e) = sources::mcp::toggle(&self.paths, &scope, &name) {
+                self.message = Some(format!("Error: {e}"));
+            } else {
+                self.message = Some(format!("Toggled: {name}"));
+                self.data.mcp = sources::mcp::load(&self.paths);
+            }
+        } else {
+            self.message = Some("No server selected".to_string());
+        }
     }
 
     fn action_edit_external(&mut self) {
