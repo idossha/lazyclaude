@@ -1,11 +1,11 @@
 [package]
-name = "ccm"
+name = "lazyclaude"
 version = "0.1.0"
 edition = "2021"
-description = "Claude Code Manager — TUI for managing all Claude Code configuration"
+description = "A lazygit-inspired TUI for managing Claude Code configuration"
 license = "MIT"
-repository = "https://github.com/idohaber/ccm"
-homepage = "https://github.com/idohaber/ccm"
+repository = "https://github.com/idohaber/lazyclaude"
+homepage = "https://github.com/idohaber/lazyclaude"
 readme = "README.md"
 keywords = ["claude", "claude-code", "tui", "config", "manager"]
 categories = ["command-line-utilities", "development-tools"]

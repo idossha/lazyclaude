@@ -5,11 +5,11 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-use ccm::config::Paths;
-use ccm::sources;
+use lazyclaude::config::Paths;
+use lazyclaude::sources;
 
 #[derive(Parser)]
-#[command(name = "ccm", about = "Claude Code Manager — TUI for managing all Claude Code configuration")]
+#[command(name = "lazyclaude", about = "A lazygit-inspired TUI for managing Claude Code configuration")]
 struct Cli {
     /// Dump all configuration as JSON (for scripting / nvim integration)
     #[arg(long)]

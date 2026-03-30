@@ -6,13 +6,12 @@ use ratatui::style::{Color, Style};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
-use crate::app::{App, InputMode, View};
+use crate::app::{App, InputMode};
 
 pub fn render(frame: &mut Frame, app: &mut App) {
-    match app.view {
-        View::Dashboard => dashboard::render(frame, app),
-        _ => views::render(frame, app),
-    }
+    // For now, use the dashboard renderer which handles the new panel layout.
+    // The views module is available for future detail-pane rendering.
+    dashboard::render(frame, app);
 
     // Render input/confirm overlay on top
     render_overlay(frame, app);

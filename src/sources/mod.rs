@@ -5,8 +5,13 @@ pub mod keybindings;
 pub mod mcp;
 pub mod mcp_registry;
 pub mod memory;
+pub mod projects;
+pub mod sessions;
 pub mod settings;
 pub mod skills;
+
+pub use projects::Project;
+pub use sessions::Session;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -23,6 +28,7 @@ pub struct SourceData {
     pub claude_md: Vec<ClaudeMdFile>,
     pub keybindings: Vec<Keybinding>,
     pub agents: Vec<Agent>,
+    pub sessions: Vec<Session>,
 }
 
 #[derive(Default, Clone, serde::Serialize)]
@@ -143,7 +149,13 @@ pub fn load_all(paths: &crate::config::Paths) -> SourceData {
         claude_md: claude_md::load(paths),
         keybindings: keybindings::load(paths),
         agents: agents::load(paths),
+        sessions: Vec::new(),
     }
+}
+
+/// Discover all known projects under the claude config directory.
+pub fn load_projects(paths: &crate::config::Paths) -> Vec<Project> {
+    projects::discover(paths.claude_dir())
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// All resolved paths for Claude Code configuration.
@@ -32,6 +32,23 @@ impl Paths {
             claude_dir,
             project_root,
         }
+    }
+
+    /// Construct from a discovered project.
+    ///
+    /// The project's `name` field is the decoded absolute path to the
+    /// project root (e.g. `/Users/foo/myproject`).
+    pub fn from_project(claude_dir: &Path, project: &crate::sources::Project) -> Self {
+        Self {
+            home_dir: dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp")),
+            claude_dir: claude_dir.to_path_buf(),
+            project_root: PathBuf::from(&project.name),
+        }
+    }
+
+    /// Return a reference to the claude config directory.
+    pub fn claude_dir(&self) -> &Path {
+        &self.claude_dir
     }
 
     /// Encode a project path to Claude Code's directory name format.

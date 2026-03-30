@@ -1,4 +1,4 @@
-//! Integration tests for ccm configuration source discovery.
+//! Integration tests for lazyclaude configuration source discovery.
 //!
 //! Each test creates a mock filesystem using `tempfile::TempDir` and verifies
 //! that the loaders correctly discover files at both user and project scopes.
@@ -6,8 +6,8 @@
 use std::fs;
 use tempfile::TempDir;
 
-use ccm::config::Paths;
-use ccm::sources;
+use lazyclaude::config::Paths;
+use lazyclaude::sources;
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 

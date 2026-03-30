@@ -1,243 +1,97 @@
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
-use ratatui::{widgets::ListState, DefaultTerminal};
+use ratatui::DefaultTerminal;
+use std::path::PathBuf;
 use std::time::Duration;
 
-use ccm::config::Paths;
-use ccm::sources::{self, SourceData};
+use lazyclaude::config::Paths;
+use lazyclaude::sources::{self, SourceData};
 use crate::ui;
 
-// ── Section definitions ─────────────────────────────────────────────────
+// ── Panel definitions ─────────────────────────────────────────────────
 
-pub struct SectionDef {
-    pub label: &'static str,
-    pub view: View,
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Panel {
+    Projects,  // 1
+    Config,    // 2 — CLAUDE.md, rules
+    Memory,    // 3
+    Skills,    // 4
+    Agents,    // 5
+    Mcp,       // 6
+    Settings,  // 7 — permissions, hooks, keybindings combined
+    Sessions,  // 8
 }
 
-impl SectionDef {
-    pub fn count(&self, data: &SourceData) -> usize {
-        match self.view {
-            View::Memory => data.memory.files.len(),
-            View::Skills => data.skills.len(),
-            View::Mcp => data.mcp.user.len() + data.mcp.project.len(),
-            View::Settings => data.settings.permissions.allow.len() + data.settings.permissions.deny.len(),
-            View::Hooks => data.hooks.len(),
-            View::ClaudeMd => data.claude_md.len(),
-            View::Keybindings => data.keybindings.len(),
-            View::Agents => data.agents.len(),
-            _ => 0,
-        }
-    }
-
-    pub fn preview<'a>(
-        &self,
-        data: &'a SourceData,
-        filter: &str,
-        _width: usize,
-    ) -> Vec<ratatui::text::Line<'a>> {
-        use ratatui::style::{Color, Modifier, Style};
-        use ratatui::text::{Line, Span};
-
-        let fl = filter.to_lowercase();
-        let matches = |s: &str| filter.is_empty() || s.to_lowercase().contains(&fl);
-
-        match self.view {
-            View::Memory => {
-                let mut lines = vec![Line::from("")];
-                if !data.memory.project.is_empty() {
-                    lines.push(Line::from(vec![
-                        Span::styled("  project: ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(data.memory.project.as_str(), Style::default().fg(Color::White)),
-                    ]));
-                    lines.push(Line::from(""));
-                }
-                for f in &data.memory.files {
-                    if !matches(&f.name) { continue; }
-                    let badge = format!("[{}]", &f.mem_type[..f.mem_type.len().min(4)]);
-                    lines.push(Line::from(vec![
-                        Span::styled("  ", Style::default()),
-                        Span::styled(f.name.as_str(), Style::default().fg(Color::Green)),
-                        Span::styled(format!("  {badge}"), Style::default().fg(Color::Cyan)),
-                    ]));
-                }
-                if data.memory.files.is_empty() {
-                    lines.push(Line::from(Span::styled("  No memory files", Style::default().fg(Color::DarkGray))));
-                }
-                lines
-            }
-            View::Skills => {
-                let mut lines = vec![Line::from("")];
-                for s in &data.skills {
-                    if !matches(&s.name) { continue; }
-                    let (badge, color) = if s.user_invocable { ("[inv]", Color::Green) } else { ("[int]", Color::DarkGray) };
-                    lines.push(Line::from(vec![
-                        Span::styled("  ", Style::default()),
-                        Span::styled(s.name.as_str(), Style::default().fg(color)),
-                        Span::styled(format!("  {badge}"), Style::default().fg(color)),
-                        Span::styled(format!("  [{}]", s.scope), Style::default().fg(Color::Cyan)),
-                    ]));
-                }
-                if data.skills.is_empty() {
-                    lines.push(Line::from(Span::styled("  No skills", Style::default().fg(Color::DarkGray))));
-                }
-                lines
-            }
-            View::Mcp => {
-                let mut lines = vec![Line::from("")];
-                for (label, servers) in &[("User", &data.mcp.user), ("Project", &data.mcp.project)] {
-                    if servers.is_empty() { continue; }
-                    lines.push(Line::from(Span::styled(format!("  {label}"), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))));
-                    for s in *servers {
-                        if !matches(&s.name) { continue; }
-                        let color = if s.disabled { Color::DarkGray } else { Color::Green };
-                        lines.push(Line::from(vec![
-                            Span::styled("    ", Style::default()),
-                            Span::styled(s.name.as_str(), Style::default().fg(color)),
-                        ]));
-                    }
-                }
-                if data.mcp.user.is_empty() && data.mcp.project.is_empty() {
-                    lines.push(Line::from(Span::styled("  No MCP servers", Style::default().fg(Color::DarkGray))));
-                }
-                lines
-            }
-            View::Settings => {
-                let mut lines = vec![Line::from("")];
-                let p = &data.settings.permissions;
-                if !p.allow.is_empty() {
-                    lines.push(Line::from(Span::styled("  Allow", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))));
-                    for r in &p.allow {
-                        if !matches(&r.rule) { continue; }
-                        lines.push(Line::from(vec![
-                            Span::styled("    ", Style::default()),
-                            Span::styled(r.rule.as_str(), Style::default().fg(Color::White)),
-                            Span::styled(format!("  [{}]", r.scope), Style::default().fg(Color::Cyan)),
-                        ]));
-                    }
-                }
-                if !p.deny.is_empty() {
-                    lines.push(Line::from(Span::styled("  Deny", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))));
-                    for r in &p.deny {
-                        if !matches(&r.rule) { continue; }
-                        lines.push(Line::from(vec![
-                            Span::styled("    ", Style::default()),
-                            Span::styled(r.rule.as_str(), Style::default().fg(Color::White)),
-                            Span::styled(format!("  [{}]", r.scope), Style::default().fg(Color::Red)),
-                        ]));
-                    }
-                }
-                lines
-            }
-            View::Hooks => {
-                let mut lines = vec![Line::from("")];
-                let mut cur_event = String::new();
-                for h in &data.hooks {
-                    if !matches(&h.command) && !matches(&h.event) { continue; }
-                    if h.event != cur_event {
-                        cur_event = h.event.clone();
-                        lines.push(Line::from(Span::styled(format!("  {cur_event}"), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))));
-                    }
-                    lines.push(Line::from(vec![
-                        Span::styled("    ", Style::default()),
-                        Span::styled(h.matcher.as_str(), Style::default().fg(Color::Green)),
-                        Span::styled(" -> ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(h.command.as_str(), Style::default().fg(Color::White)),
-                    ]));
-                }
-                if data.hooks.is_empty() {
-                    lines.push(Line::from(Span::styled("  No hooks", Style::default().fg(Color::DarkGray))));
-                }
-                lines
-            }
-            View::ClaudeMd => {
-                let mut lines = vec![Line::from("")];
-                for f in &data.claude_md {
-                    if !matches(&f.name) { continue; }
-                    let size = if f.size < 1024 { format!("{} B", f.size) } else { format!("{:.1} KB", f.size as f64 / 1024.0) };
-                    lines.push(Line::from(vec![
-                        Span::styled("  ", Style::default()),
-                        Span::styled(f.name.as_str(), Style::default().fg(Color::Green)),
-                        Span::styled(format!("  [{}]  {size}", f.scope), Style::default().fg(Color::DarkGray)),
-                    ]));
-                }
-                if data.claude_md.is_empty() {
-                    lines.push(Line::from(Span::styled("  No instruction files", Style::default().fg(Color::DarkGray))));
-                }
-                lines
-            }
-            View::Keybindings => {
-                let mut lines = vec![Line::from("")];
-                for b in &data.keybindings {
-                    if !matches(&b.key) && !matches(&b.command) { continue; }
-                    lines.push(Line::from(vec![
-                        Span::styled("  ", Style::default()),
-                        Span::styled(b.key.as_str(), Style::default().fg(Color::Yellow)),
-                        Span::styled(" -> ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(b.command.as_str(), Style::default().fg(Color::White)),
-                    ]));
-                }
-                if data.keybindings.is_empty() {
-                    lines.push(Line::from(Span::styled("  No keybindings", Style::default().fg(Color::DarkGray))));
-                }
-                lines
-            }
-            View::Agents => {
-                let mut lines = vec![Line::from("")];
-                for a in &data.agents {
-                    if !matches(&a.name) { continue; }
-                    lines.push(Line::from(vec![
-                        Span::styled("  ", Style::default()),
-                        Span::styled(a.name.as_str(), Style::default().fg(Color::Green)),
-                        Span::styled(format!("  [{}]", a.scope), Style::default().fg(Color::Cyan)),
-                        if !a.model.is_empty() {
-                            Span::styled(format!("  {}", a.model), Style::default().fg(Color::DarkGray))
-                        } else {
-                            Span::styled("", Style::default())
-                        },
-                    ]));
-                }
-                if data.agents.is_empty() {
-                    lines.push(Line::from(Span::styled("  No agents", Style::default().fg(Color::DarkGray))));
-                }
-                lines
-            }
-            _ => vec![],
-        }
-    }
-}
-
-pub const SECTIONS: &[SectionDef] = &[
-    SectionDef { label: "Memory", view: View::Memory },
-    SectionDef { label: "Skills", view: View::Skills },
-    SectionDef { label: "MCP Servers", view: View::Mcp },
-    SectionDef { label: "Settings", view: View::Settings },
-    SectionDef { label: "Hooks", view: View::Hooks },
-    SectionDef { label: "CLAUDE.md", view: View::ClaudeMd },
-    SectionDef { label: "Keybindings", view: View::Keybindings },
-    SectionDef { label: "Agents", view: View::Agents },
+pub const PANELS: &[Panel] = &[
+    Panel::Projects,
+    Panel::Config,
+    Panel::Memory,
+    Panel::Skills,
+    Panel::Agents,
+    Panel::Mcp,
+    Panel::Settings,
+    Panel::Sessions,
 ];
 
-// ── Core types ──────────────────────────────────────────────────────────
+impl Panel {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Panel::Projects => "Projects",
+            Panel::Config   => "Config",
+            Panel::Memory   => "Memory",
+            Panel::Skills   => "Skills",
+            Panel::Agents   => "Agents",
+            Panel::Mcp      => "MCP",
+            Panel::Settings => "Settings",
+            Panel::Sessions => "Sessions",
+        }
+    }
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum View {
-    Dashboard,
-    Memory,
-    Skills,
-    Mcp,
-    McpSearch,
-    Settings,
-    Hooks,
-    ClaudeMd,
-    Keybindings,
-    Agents,
+    pub fn index(&self) -> usize {
+        match self {
+            Panel::Projects => 0,
+            Panel::Config   => 1,
+            Panel::Memory   => 2,
+            Panel::Skills   => 3,
+            Panel::Agents   => 4,
+            Panel::Mcp      => 5,
+            Panel::Settings => 6,
+            Panel::Sessions => 7,
+        }
+    }
+
+    pub fn from_index(i: usize) -> Option<Panel> {
+        PANELS.get(i).copied()
+    }
+
+    pub fn count(&self, app: &App) -> usize {
+        match self {
+            Panel::Projects => app.projects.len() + 1, // +1 for Global
+            Panel::Config   => app.data.claude_md.len(),
+            Panel::Memory   => app.data.memory.files.len(),
+            Panel::Skills   => app.data.skills.len(),
+            Panel::Agents   => app.data.agents.len(),
+            Panel::Mcp      => app.data.mcp.user.len() + app.data.mcp.project.len(),
+            Panel::Settings => {
+                app.data.settings.permissions.allow.len()
+                    + app.data.settings.permissions.deny.len()
+                    + app.data.hooks.len()
+                    + app.data.keybindings.len()
+            }
+            Panel::Sessions => app.data.sessions.len(),
+        }
+    }
 }
 
+// ── Focus ───────────────────────────────────────────────────────────────
+
 #[derive(Clone, Copy, PartialEq)]
-pub enum Pane {
-    Left,
-    Right,
+pub enum Focus {
+    Panels,
+    Detail,
 }
+
+// ── Input / confirm types ───────────────────────────────────────────────
 
 pub enum InputMode {
     Normal,
@@ -273,57 +127,70 @@ pub enum ConfirmPurpose {
 
 pub struct App {
     pub running: bool,
-    pub view: View,
-    pub prev_view: Option<View>,
-    pub section_index: usize,
-    pub focused_pane: Pane,
+
+    // Panel navigation
+    pub active_panel: Panel,
+    pub panel_offsets: [usize; 8],
+    pub focus: Focus,
+
+    // Project selection
+    pub projects: Vec<sources::Project>,
+    pub selected_project: usize, // index into projects list; 0 = Global
+    pub claude_dir: PathBuf,
+
+    // Data for current project
     pub paths: Paths,
     pub data: SourceData,
+
+    // UI state
     pub filter: String,
     pub show_help: bool,
     pub input_mode: InputMode,
-    pub list_state: ListState,
-    pub scroll: usize,
+    pub detail_scroll: usize,
     pub message: Option<String>,
+
+    // MCP search
     pub registry_results: Vec<sources::mcp_registry::RegistryEntry>,
-    /// Set by `e` key — picked up by `run()` which has terminal access.
-    pub pending_edit: Option<std::path::PathBuf>,
-    /// Maps each list position to an editable file path (None for headers/hints).
-    /// Rebuilt every render by `build_items`.
-    pub item_paths: Vec<Option<std::path::PathBuf>>,
-    /// Maps each list position to file content for preview (None for headers/hints).
-    /// Rebuilt every render by `build_items`.
+    pub mcp_search_active: bool,
+
+    // External edit
+    pub pending_edit: Option<PathBuf>,
+    pub item_paths: Vec<Option<PathBuf>>,
     pub item_bodies: Vec<Option<String>>,
-    /// Scroll offset for the content preview pane.
-    pub preview_scroll: usize,
 }
 
 impl App {
-    pub fn with_paths(paths: Paths) -> Self {
+    pub fn new(paths: Paths) -> Self {
+        let claude_dir = paths.claude_dir.clone();
+        let projects = sources::load_projects(&paths);
         let data = sources::load_all(&paths);
-        let mut list_state = ListState::default();
-        list_state.select(Some(0));
 
         Self {
             running: true,
-            view: View::Dashboard,
-            prev_view: None,
-            section_index: 0,
-            focused_pane: Pane::Left,
+            active_panel: Panel::Projects,
+            panel_offsets: [0; 8],
+            focus: Focus::Panels,
+            projects,
+            selected_project: 0, // Global
+            claude_dir,
             paths,
             data,
             filter: String::new(),
             show_help: false,
             input_mode: InputMode::Normal,
-            list_state,
-            scroll: 0,
+            detail_scroll: 0,
             message: None,
             registry_results: Vec::new(),
+            mcp_search_active: false,
             pending_edit: None,
             item_paths: Vec::new(),
             item_bodies: Vec::new(),
-            preview_scroll: 0,
         }
+    }
+
+    /// Keep the old name working so main.rs compiles unchanged.
+    pub fn with_paths(paths: Paths) -> Self {
+        Self::new(paths)
     }
 
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
@@ -375,8 +242,9 @@ impl App {
         Ok(())
     }
 
+    // ── Key dispatch ───────────────────────────────────────────────────
+
     fn handle_key(&mut self, key: KeyEvent) {
-        // Dispatch based on input mode first
         match &self.input_mode {
             InputMode::Normal => self.handle_normal_key(key),
             InputMode::Input(_) => self.handle_input_key(key),
@@ -397,48 +265,85 @@ impl App {
                 });
             }
             KeyCode::Char('R') => self.refresh(),
-            KeyCode::Tab => {
-                if self.view == View::Dashboard {
-                    self.focused_pane = match self.focused_pane {
-                        Pane::Left => Pane::Right,
-                        Pane::Right => Pane::Left,
-                    };
+
+            // Direct panel selection with number keys
+            KeyCode::Char(c @ '1'..='8') => {
+                let idx = (c as usize) - ('1' as usize);
+                if let Some(panel) = Panel::from_index(idx) {
+                    self.active_panel = panel;
+                    self.detail_scroll = 0;
                 }
             }
-            // Preview scroll (shift+j/k)
-            KeyCode::Char('J') => { self.preview_scroll = self.preview_scroll.saturating_add(3); }
-            KeyCode::Char('K') => { self.preview_scroll = self.preview_scroll.saturating_sub(3); }
-            // Navigation
+
+            // Toggle focus
+            KeyCode::Tab => {
+                self.focus = match self.focus {
+                    Focus::Panels => Focus::Detail,
+                    Focus::Detail => Focus::Panels,
+                };
+            }
+
+            // Detail scroll (Shift+j/k)
+            KeyCode::Char('J') => {
+                self.detail_scroll = self.detail_scroll.saturating_add(3);
+            }
+            KeyCode::Char('K') => {
+                self.detail_scroll = self.detail_scroll.saturating_sub(3);
+            }
+
+            // Navigation within active panel
             KeyCode::Char('j') | KeyCode::Down => self.move_down(),
             KeyCode::Char('k') | KeyCode::Up => self.move_up(),
-            // MCP search view — handle before generic Enter/Back
-            KeyCode::Enter if self.view == View::McpSearch => {
-                self.action_install_registry_mcp();
+
+            // Enter / right — select project or switch to detail
+            KeyCode::Enter | KeyCode::Char('l') => {
+                if self.mcp_search_active {
+                    self.action_install_registry_mcp();
+                } else if self.active_panel == Panel::Projects && self.focus == Focus::Panels {
+                    self.select_project();
+                } else if self.focus == Focus::Panels {
+                    self.focus = Focus::Detail;
+                }
             }
-            KeyCode::Backspace | KeyCode::Char('h') if self.view == View::McpSearch => {
-                self.view = View::Mcp;
-                self.list_state = ListState::default();
-                self.list_state.select(Some(0));
-                self.registry_results.clear();
+
+            // Back / left
+            KeyCode::Backspace | KeyCode::Char('h') => {
+                if self.mcp_search_active {
+                    self.mcp_search_active = false;
+                    self.registry_results.clear();
+                } else if self.focus == Focus::Detail {
+                    self.focus = Focus::Panels;
+                }
             }
-            KeyCode::Enter | KeyCode::Char('l') => self.zoom_in(),
-            KeyCode::Backspace | KeyCode::Char('h') if self.view != View::Dashboard => self.zoom_out(),
+
+            // Escape
             KeyCode::Esc => {
                 if !self.filter.is_empty() {
                     self.filter.clear();
-                } else if self.view == View::McpSearch {
-                    self.view = View::Mcp;
-                    self.list_state = ListState::default();
-                    self.list_state.select(Some(0));
+                } else if self.mcp_search_active {
+                    self.mcp_search_active = false;
                     self.registry_results.clear();
-                } else if self.view != View::Dashboard {
-                    self.zoom_out();
+                } else if self.focus == Focus::Detail {
+                    self.focus = Focus::Panels;
                 }
             }
-            // CRUD actions in zoomed views
-            KeyCode::Char('a') if self.view != View::Dashboard => self.action_add(),
-            KeyCode::Char('d') if self.view != View::Dashboard => self.action_delete(),
-            KeyCode::Char('D') if self.view == View::Settings => {
+
+            // Edit in external editor
+            KeyCode::Char('e') if matches!(
+                self.active_panel,
+                Panel::Config | Panel::Memory | Panel::Skills | Panel::Agents
+            ) => {
+                self.action_edit_external();
+            }
+
+            // Add action
+            KeyCode::Char('a') => self.action_add(),
+
+            // Delete action
+            KeyCode::Char('d') => self.action_delete(),
+
+            // Add deny permission
+            KeyCode::Char('D') if self.active_panel == Panel::Settings => {
                 self.input_mode = InputMode::Input(InputState {
                     prompt: "Deny permission".to_string(),
                     value: String::new(),
@@ -446,8 +351,9 @@ impl App {
                     purpose: InputPurpose::AddPermission { kind: "deny".to_string() },
                 });
             }
-            KeyCode::Char('t') if self.view == View::Mcp => self.action_toggle_mcp(),
-            KeyCode::Char('s') if self.view == View::Mcp || self.view == View::McpSearch => {
+
+            // Search MCP registry
+            KeyCode::Char('s') if self.active_panel == Panel::Mcp || self.mcp_search_active => {
                 self.input_mode = InputMode::Input(InputState {
                     prompt: "Search MCP registry (npm)".to_string(),
                     value: String::new(),
@@ -455,15 +361,17 @@ impl App {
                     purpose: InputPurpose::SearchMcpRegistry,
                 });
             }
-            KeyCode::Char('e') if matches!(self.view, View::Memory | View::ClaudeMd | View::Agents | View::Skills) => {
-                self.action_edit_external();
+
+            // Toggle MCP server
+            KeyCode::Char('t') if self.active_panel == Panel::Mcp => {
+                self.action_toggle_mcp();
             }
+
             _ => {}
         }
     }
 
     fn handle_input_key(&mut self, key: KeyEvent) {
-        // Take ownership of the input state temporarily
         let InputMode::Input(ref mut state) = self.input_mode else { return };
 
         match key.code {
@@ -548,9 +456,7 @@ impl App {
                         Ok(results) => {
                             let count = results.len();
                             self.registry_results = results;
-                            self.view = View::McpSearch;
-                            self.list_state = ListState::default();
-                            self.list_state.select(Some(0));
+                            self.mcp_search_active = true;
                             self.message = Some(format!("Found {count} packages"));
                         }
                         Err(e) => {
@@ -603,7 +509,7 @@ impl App {
                 } else {
                     self.message = Some(format!("Installed: {}", entry.name));
                     self.data.mcp = sources::mcp::load(&self.paths);
-                    self.view = View::Mcp;
+                    self.mcp_search_active = false;
                     self.registry_results.clear();
                 }
             }
@@ -612,60 +518,66 @@ impl App {
 
     // ── Navigation ──────────────────────────────────────────────────────
 
+    pub fn panel_offset(&self) -> usize {
+        self.panel_offsets[self.active_panel.index()]
+    }
+
     fn move_down(&mut self) {
-        if self.view == View::Dashboard && self.focused_pane == Pane::Left {
-            if self.section_index < SECTIONS.len() - 1 {
-                self.section_index += 1;
-                self.list_state.select(Some(self.section_index));
-            }
-        } else {
-            let i = self.list_state.selected().unwrap_or(0);
-            self.list_state.select(Some(i.saturating_add(1)));
+        let max = self.active_panel.count(self);
+        let idx = self.active_panel.index();
+        if max > 0 && self.panel_offsets[idx] < max - 1 {
+            self.panel_offsets[idx] += 1;
         }
-        self.preview_scroll = 0;
+        self.detail_scroll = 0;
     }
 
     fn move_up(&mut self) {
-        if self.view == View::Dashboard && self.focused_pane == Pane::Left {
-            self.section_index = self.section_index.saturating_sub(1);
-            self.list_state.select(Some(self.section_index));
-        } else {
-            let i = self.list_state.selected().unwrap_or(0);
-            self.list_state.select(Some(i.saturating_sub(1)));
-        }
-        self.preview_scroll = 0;
+        let idx = self.active_panel.index();
+        self.panel_offsets[idx] = self.panel_offsets[idx].saturating_sub(1);
+        self.detail_scroll = 0;
     }
 
-    fn zoom_in(&mut self) {
-        if self.view == View::Dashboard {
-            self.prev_view = Some(View::Dashboard);
-            self.view = SECTIONS[self.section_index].view;
-            self.list_state = ListState::default();
-            self.list_state.select(Some(0));
-            self.scroll = 0;
-            self.filter.clear();
+    fn select_project(&mut self) {
+        let idx = self.panel_offsets[Panel::Projects.index()];
+        if idx == 0 {
+            // Global (User) — use default detected paths
+            self.selected_project = 0;
+            self.paths = Paths::detect();
+        } else if let Some(project) = self.projects.get(idx - 1) {
+            self.selected_project = idx;
+            self.paths = Paths::from_project(&self.claude_dir, project);
         }
+        self.reload_data();
+        // Reset panel offsets for content panels (keep Projects offset)
+        for i in 1..8 {
+            self.panel_offsets[i] = 0;
+        }
+        self.detail_scroll = 0;
+        self.message = Some("Project loaded".to_string());
     }
 
-    fn zoom_out(&mut self) {
-        self.view = View::Dashboard;
-        self.list_state = ListState::default();
-        self.list_state.select(Some(self.section_index));
-        self.scroll = 0;
-        self.filter.clear();
-        self.show_help = false;
+    fn reload_data(&mut self) {
+        self.data = sources::load_all(&self.paths);
+        // Load sessions for selected project
+        if self.selected_project > 0 {
+            if let Some(project) = self.projects.get(self.selected_project - 1) {
+                self.data.sessions = sources::sessions::load_sessions(&project.dir);
+            }
+        }
     }
 
     fn refresh(&mut self) {
-        self.data = sources::load_all(&self.paths);
+        let detect_paths = Paths::detect();
+        self.projects = sources::load_projects(&detect_paths);
+        self.reload_data();
         self.message = Some("Refreshed".to_string());
     }
 
     // ── CRUD actions ────────────────────────────────────────────────────
 
     fn action_add(&mut self) {
-        match self.view {
-            View::Settings => {
+        match self.active_panel {
+            Panel::Settings => {
                 self.input_mode = InputMode::Input(InputState {
                     prompt: "Allow permission".to_string(),
                     value: String::new(),
@@ -673,7 +585,7 @@ impl App {
                     purpose: InputPurpose::AddPermission { kind: "allow".to_string() },
                 });
             }
-            View::Mcp => {
+            Panel::Mcp => {
                 self.input_mode = InputMode::Input(InputState {
                     prompt: "Add server (name command args...)".to_string(),
                     value: String::new(),
@@ -686,27 +598,24 @@ impl App {
     }
 
     fn action_delete(&mut self) {
-        match self.view {
-            View::Settings => {
-                // Find which permission the cursor is on
-                let idx = self.list_state.selected().unwrap_or(0);
+        match self.active_panel {
+            Panel::Settings => {
+                let idx = self.panel_offset();
                 let perms = &self.data.settings.permissions;
-                let allow_header = 1; // "Allow" header line
                 let allow_count = perms.allow.len();
-                let deny_header_offset = if allow_count > 0 { allow_header + allow_count } else { 0 };
 
-                if idx > 0 && idx <= allow_count {
-                    let perm = &perms.allow[idx - 1];
+                if idx < allow_count {
+                    let perm = &perms.allow[idx];
                     self.input_mode = InputMode::Confirm(ConfirmState {
                         message: format!("Delete allow rule '{}'?", perm.rule),
                         purpose: ConfirmPurpose::DeletePermission {
                             scope: perm.scope.clone(),
                             kind: "allow".to_string(),
-                            index: idx - 1,
+                            index: idx,
                         },
                     });
-                } else if idx > deny_header_offset && idx <= deny_header_offset + perms.deny.len() + 1 {
-                    let deny_idx = idx - deny_header_offset - 1;
+                } else {
+                    let deny_idx = idx - allow_count;
                     if deny_idx < perms.deny.len() {
                         let perm = &perms.deny[deny_idx];
                         self.input_mode = InputMode::Confirm(ConfirmState {
@@ -720,9 +629,7 @@ impl App {
                     }
                 }
             }
-            View::Mcp => {
-                // Find which server the cursor is on — need to map list index to actual server
-                // For now, simple heuristic based on flat list
+            Panel::Mcp => {
                 self.message = Some("Position cursor on a server and press 'd'".to_string());
             }
             _ => {}
@@ -730,7 +637,7 @@ impl App {
     }
 
     fn action_install_registry_mcp(&mut self) {
-        let idx = self.list_state.selected().unwrap_or(0);
+        let idx = self.panel_offset();
         if let Some(entry) = self.registry_results.get(idx) {
             self.input_mode = InputMode::Confirm(ConfirmState {
                 message: format!("Install '{}' to user scope?", entry.name),
@@ -747,7 +654,7 @@ impl App {
     }
 
     fn action_edit_external(&mut self) {
-        let idx = self.list_state.selected().unwrap_or(0);
+        let idx = self.panel_offset();
         // item_paths is rebuilt every render — handles scope headers correctly
         self.pending_edit = self.item_paths.get(idx).and_then(|p| p.clone());
     }
