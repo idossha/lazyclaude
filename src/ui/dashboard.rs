@@ -36,7 +36,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 
     render_panels(frame, app, chunks[0]);
     if app.show_help {
-        render_help(frame, chunks[1]);
+        render_help(frame, app.active_panel, app.detail_scroll, chunks[1]);
     } else {
         render_detail(frame, app, chunks[1]);
     }

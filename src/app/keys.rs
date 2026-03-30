@@ -20,7 +20,10 @@ impl App {
     fn handle_normal_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Char('q') => self.running = false,
-            KeyCode::Char('?') => self.show_help = !self.show_help,
+            KeyCode::Char('?') => {
+                self.show_help = !self.show_help;
+                self.detail_scroll = 0;
+            }
             KeyCode::Char('/') => {
                 self.input_mode = InputMode::Input(InputState {
                     prompt: "Filter".to_string(),
@@ -73,20 +76,28 @@ impl App {
 
             // Navigation: panels (left) vs detail (right) vs preview scroll
             KeyCode::Char('j') | KeyCode::Down => {
-                match self.focus {
-                    Focus::Panels => self.move_panel_down(),
-                    Focus::Detail => self.move_down(),
-                    Focus::Preview => {
-                        self.detail_scroll = self.detail_scroll.saturating_add(1);
+                if self.show_help && self.focus != Focus::Panels {
+                    self.detail_scroll = self.detail_scroll.saturating_add(1);
+                } else {
+                    match self.focus {
+                        Focus::Panels => self.move_panel_down(),
+                        Focus::Detail => self.move_down(),
+                        Focus::Preview => {
+                            self.detail_scroll = self.detail_scroll.saturating_add(1);
+                        }
                     }
                 }
             }
             KeyCode::Char('k') | KeyCode::Up => {
-                match self.focus {
-                    Focus::Panels => self.move_panel_up(),
-                    Focus::Detail => self.move_up(),
-                    Focus::Preview => {
-                        self.detail_scroll = self.detail_scroll.saturating_sub(1);
+                if self.show_help && self.focus != Focus::Panels {
+                    self.detail_scroll = self.detail_scroll.saturating_sub(1);
+                } else {
+                    match self.focus {
+                        Focus::Panels => self.move_panel_up(),
+                        Focus::Detail => self.move_up(),
+                        Focus::Preview => {
+                            self.detail_scroll = self.detail_scroll.saturating_sub(1);
+                        }
                     }
                 }
             }
