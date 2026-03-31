@@ -38,6 +38,7 @@ src/
     mod.rs               # Data types (SourceData, Scope), load_all(), helpers
     agents.rs            # Agent loader
     claude_md.rs         # CLAUDE.md and rules loader
+    commands.rs          # Legacy slash command loader
     hooks.rs             # Hooks loader from settings.json
     keybindings.rs       # keybindings.json loader
     mcp.rs               # MCP server loader
@@ -88,12 +89,13 @@ These are the canonical paths this tool reads/writes. Keep in sync with Claude C
 - `<project>/.claude/rules/*.md` -- project rules (recursive subdirs supported)
 - `~/.claude/rules/*.md` -- user-level rules
 
-### Skills & Agents
+### Skills, Agents & Commands
 - Skills: `~/.claude/skills/<name>/SKILL.md` (user), `<project>/.claude/skills/<name>/SKILL.md` (project)
 - Agents: `~/.claude/agents/<name>.md` (user, flat files), `<project>/.claude/agents/<name>.md` (project, flat files)
+- Commands: `~/.claude/commands/<name>.md` (user), `<project>/.claude/commands/<name>.md` (project) -- legacy, prefer skills
 
 ### MCP Servers
-- `~/.claude.json` -- user-level MCP (mcpServers field) and local per-project MCP
+- `~/.mcp.json` -- user-level MCP (mcpServers field, cross-tool standard)
 - `<project>/.mcp.json` -- project-level MCP (committed)
 
 ### Memory

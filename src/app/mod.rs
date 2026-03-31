@@ -32,6 +32,10 @@ pub enum UndoAction {
         file_path: PathBuf,
         content: String,
     },
+    Command {
+        file_path: PathBuf,
+        content: String,
+    },
     McpServer {
         scope: Scope,
         _name: String,
@@ -137,7 +141,7 @@ impl Panel {
             Panel::Projects => app.projects.len(),
             Panel::Config => app.data.claude_md.len(),
             Panel::Memory => app.data.memory.files.len(),
-            Panel::Skills => app.data.skills.len(),
+            Panel::Skills => app.data.skills.len() + app.data.commands.len(),
             Panel::Agents => app.data.agents.len(),
             Panel::Mcp => app.data.mcp.project.len() + app.data.mcp.user.len(),
             Panel::Settings => {
@@ -214,7 +218,7 @@ impl Panel {
                 )
             }
             Panel::Skills => {
-                scope_group_count(
+                let n = scope_group_count(
                     app.data
                         .skills
                         .iter()
@@ -226,7 +230,13 @@ impl Panel {
                         .iter()
                         .filter(|s| s.scope == Scope::User)
                         .count(),
-                )
+                );
+                let cmds = app.data.commands.len();
+                if cmds > 0 {
+                    n + 1 + cmds
+                } else {
+                    n
+                }
             }
             Panel::Agents => {
                 scope_group_count(
@@ -348,6 +358,10 @@ pub enum ConfirmPurpose {
         name: String,
     },
     DeleteAgent {
+        path: PathBuf,
+        name: String,
+    },
+    DeleteCommand {
         path: PathBuf,
         name: String,
     },

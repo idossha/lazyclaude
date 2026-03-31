@@ -2733,3 +2733,117 @@ fn test_mcp_registry_preview_body_empty_date() {
     // Empty date should not show "Published:" line
     assert!(!body.contains("Published:"));
 }
+
+// ── Commands ────────────────────────────────────────────────────────────
+
+#[test]
+fn test_commands_dual_scope() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    // User-level command: ~/.claude/commands/test.md
+    write_fixture(
+        claude_dir.path(),
+        "commands/test.md",
+        "---\nname: test\ndescription: Run tests\n---\nRun the test suite.",
+    );
+
+    // Project-level command: <project>/.claude/commands/deploy.md
+    write_fixture(
+        project_root.path(),
+        ".claude/commands/deploy.md",
+        "---\nname: deploy\ndescription: Deploy to prod\n---\nDeploy the app.",
+    );
+
+    let commands = sources::commands::load(&paths);
+
+    assert_eq!(
+        commands.len(),
+        2,
+        "expected 2 commands, got {}",
+        commands.len()
+    );
+
+    let user_cmd = commands
+        .iter()
+        .find(|c| c.scope == Scope::User)
+        .expect("user command");
+    assert_eq!(user_cmd.name, "test");
+    assert_eq!(user_cmd.description, "Run tests");
+    assert_eq!(user_cmd.file_name, "test");
+    assert_eq!(user_cmd.body, "Run the test suite.");
+
+    let proj_cmd = commands
+        .iter()
+        .find(|c| c.scope == Scope::Project)
+        .expect("project command");
+    assert_eq!(proj_cmd.name, "deploy");
+    assert_eq!(proj_cmd.description, "Deploy to prod");
+    assert_eq!(proj_cmd.file_name, "deploy");
+}
+
+#[test]
+fn test_commands_defaults_name_from_filename() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    // Command without name frontmatter — should use filename
+    write_fixture(
+        claude_dir.path(),
+        "commands/review.md",
+        "Review the latest changes.",
+    );
+
+    let commands = sources::commands::load(&paths);
+    assert_eq!(commands.len(), 1);
+    assert_eq!(commands[0].name, "review");
+    assert_eq!(commands[0].file_name, "review");
+    assert_eq!(commands[0].body, "Review the latest changes.");
+}
+
+#[test]
+fn test_commands_empty_dir() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    // No commands directory at all
+    let commands = sources::commands::load(&paths);
+    assert!(commands.is_empty());
+}
+
+#[test]
+fn test_commands_ignores_non_md_files() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(claude_dir.path(), "commands/valid.md", "A valid command.");
+    write_fixture(claude_dir.path(), "commands/ignored.txt", "Not a command.");
+    write_fixture(claude_dir.path(), "commands/also-ignored.json", "{}");
+
+    let commands = sources::commands::load(&paths);
+    assert_eq!(commands.len(), 1);
+    assert_eq!(commands[0].name, "valid");
+}
+
+#[test]
+fn test_commands_ignores_directories() {
+    let claude_dir = TempDir::new().unwrap();
+    let project_root = TempDir::new().unwrap();
+    let paths = make_paths(&claude_dir, &project_root);
+
+    write_fixture(claude_dir.path(), "commands/flat.md", "A command.");
+    // Create a subdirectory (should be ignored — commands are flat files only)
+    write_fixture(
+        claude_dir.path(),
+        "commands/subdir/nested.md",
+        "Nested, should be ignored.",
+    );
+
+    let commands = sources::commands::load(&paths);
+    assert_eq!(commands.len(), 1);
+    assert_eq!(commands[0].name, "flat");
+}

@@ -36,7 +36,7 @@ struct Cli {
 enum Commands {
     /// List items from a source
     List {
-        /// Source: memory, skills, mcp, settings, hooks, claude-md, keybindings, agents
+        /// Source: memory, skills, commands, mcp, settings, hooks, claude-md, keybindings, agents
         source: String,
     },
     /// Show resolved paths for debugging
@@ -107,6 +107,7 @@ fn run_command(cmd: Commands, paths: &Paths) -> Result<()> {
             let json = match source.as_str() {
                 "memory" => serde_json::to_string_pretty(&data.memory)?,
                 "skills" => serde_json::to_string_pretty(&data.skills)?,
+                "commands" => serde_json::to_string_pretty(&data.commands)?,
                 "mcp" => serde_json::to_string_pretty(&data.mcp)?,
                 "settings" => serde_json::to_string_pretty(&data.settings)?,
                 "hooks" => serde_json::to_string_pretty(&data.hooks)?,
@@ -116,7 +117,7 @@ fn run_command(cmd: Commands, paths: &Paths) -> Result<()> {
                 "stats" => serde_json::to_string_pretty(&data.stats)?,
                 "plugins" => serde_json::to_string_pretty(&data.plugins)?,
                 "todos" => serde_json::to_string_pretty(&data.todos)?,
-                other => anyhow::bail!("unknown source: {other}. Options: memory, skills, mcp, settings, hooks, claude-md, keybindings, agents, stats, plugins, todos"),
+                other => anyhow::bail!("unknown source: {other}. Options: memory, skills, commands, mcp, settings, hooks, claude-md, keybindings, agents, stats, plugins, todos"),
             };
             println!("{json}");
         }
@@ -134,6 +135,8 @@ fn run_command(cmd: Commands, paths: &Paths) -> Result<()> {
             println!("skills (p):   {}", paths.project_skills_dir().display());
             println!("agents (u):   {}", paths.user_agents_dir().display());
             println!("agents (p):   {}", paths.project_agents_dir().display());
+            println!("commands (u): {}", paths.user_commands_dir().display());
+            println!("commands (p): {}", paths.project_commands_dir().display());
         }
     }
     Ok(())

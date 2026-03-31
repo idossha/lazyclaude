@@ -176,6 +176,24 @@ pub(crate) fn build_detail_items(
                 &format!("User ({})", user.len()),
                 user_entries,
             );
+
+            // Legacy commands (shown after skills)
+            let cmds: Vec<_> = app
+                .data
+                .commands
+                .iter()
+                .filter(|c| matches(&c.name) || matches(&c.description))
+                .collect();
+            if !cmds.is_empty() {
+                items.push(scope_header(&format!("Commands ({})", cmds.len())));
+                paths.push(None);
+                bodies.push(None);
+                for c in cmds {
+                    items.push(command_item(c));
+                    paths.push(Some(c.path.clone()));
+                    bodies.push(Some(c.body.clone()));
+                }
+            }
         }
 
         Panel::Agents => {
@@ -759,6 +777,19 @@ pub(crate) fn mcp_item(s: &lazyclaude::sources::McpServer) -> ListItem<'static> 
         Span::styled(badge, Style::default().fg(badge_color)),
         Span::styled(format!(" {}", s.name), Style::default().fg(name_color)),
         Span::styled(format!("  {cmd}"), Style::default().fg(Color::DarkGray)),
+    ]))
+}
+
+pub(crate) fn command_item(c: &lazyclaude::sources::Command) -> ListItem<'static> {
+    let scope_tag = format!("[{}]", c.scope);
+    ListItem::new(Line::from(vec![
+        Span::styled("    ", Style::default()),
+        Span::styled(format!("/{}", c.name), Style::default().fg(Color::Cyan)),
+        Span::styled("  [cmd]", Style::default().fg(Color::DarkGray)),
+        Span::styled(
+            format!("  {scope_tag}"),
+            Style::default().fg(Color::DarkGray),
+        ),
     ]))
 }
 

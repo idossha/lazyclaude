@@ -1,5 +1,6 @@
 pub mod agents;
 pub mod claude_md;
+pub mod commands;
 pub mod hooks;
 pub mod keybindings;
 pub mod mcp;
@@ -61,6 +62,7 @@ impl PartialEq<&str> for Scope {
 pub struct SourceData {
     pub memory: MemoryData,
     pub skills: Vec<Skill>,
+    pub commands: Vec<Command>,
     pub mcp: McpData,
     pub settings: SettingsData,
     pub hooks: Vec<Hook>,
@@ -109,6 +111,16 @@ pub struct Agent {
     pub model: String,
     pub body: String,
     pub dir_name: String,
+    pub scope: Scope,
+}
+
+#[derive(Default, Clone, serde::Serialize)]
+pub struct Command {
+    pub path: PathBuf,
+    pub name: String,
+    pub description: String,
+    pub body: String,
+    pub file_name: String,
     pub scope: Scope,
 }
 
@@ -218,6 +230,7 @@ pub fn load_all(paths: &crate::config::Paths) -> SourceData {
     SourceData {
         memory: memory::load(paths),
         skills: skills::load(paths),
+        commands: commands::load(paths),
         mcp: mcp::load(paths),
         settings: settings::load(paths),
         hooks: hooks::load(paths),

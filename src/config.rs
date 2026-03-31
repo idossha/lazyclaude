@@ -98,6 +98,16 @@ impl Paths {
         self.project_root.join(".claude").join("agents")
     }
 
+    /// User-level commands directory (~/.claude/commands/)
+    pub fn user_commands_dir(&self) -> PathBuf {
+        self.claude_dir.join("commands")
+    }
+
+    /// Project-level commands directory (<project>/.claude/commands/)
+    pub fn project_commands_dir(&self) -> PathBuf {
+        self.project_root.join(".claude").join("commands")
+    }
+
     /// Settings file path for a given scope
     pub fn settings_path(&self, scope: &str) -> PathBuf {
         match scope {

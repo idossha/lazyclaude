@@ -213,6 +213,20 @@ impl App {
                     self.data.skills = sources::skills::load(&self.paths);
                 }
             }
+            ConfirmPurpose::DeleteCommand { path, name } => {
+                let content = std::fs::read_to_string(&path).unwrap_or_default();
+                if let Err(e) = sources::commands::remove(&path) {
+                    tracing::error!("Failed to delete command '{}': {}", name, e);
+                    self.set_message(format!("Error: {e}"));
+                } else {
+                    self.push_undo(UndoAction::Command {
+                        file_path: path.clone(),
+                        content,
+                    });
+                    self.set_message(format!("Deleted: {name}"));
+                    self.data.commands = sources::commands::load(&self.paths);
+                }
+            }
             ConfirmPurpose::DeleteAgent { path, name } => {
                 // Save the agent file content before removing for undo
                 let content = std::fs::read_to_string(&path).unwrap_or_default();
@@ -356,21 +370,24 @@ impl App {
             Panel::Skills => {
                 let idx = self.panel_offset();
                 if let Some(path) = self.item_paths.get(idx).and_then(|p| p.as_ref()) {
-                    // Find the skill name from the bodies/paths
-                    let name = self
-                        .data
-                        .skills
-                        .iter()
-                        .find(|s| &s.path == path)
-                        .map(|s| s.name.clone())
-                        .unwrap_or_else(|| "skill".to_string());
-                    self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
-                        message: format!("Delete skill '{name}'?"),
-                        purpose: ConfirmPurpose::DeleteSkill {
-                            path: path.clone(),
-                            name,
-                        },
-                    }));
+                    // Check if it's a skill
+                    if let Some(skill) = self.data.skills.iter().find(|s| &s.path == path) {
+                        self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
+                            message: format!("Delete skill '{}'?", skill.name),
+                            purpose: ConfirmPurpose::DeleteSkill {
+                                path: path.clone(),
+                                name: skill.name.clone(),
+                            },
+                        }));
+                    } else if let Some(cmd) = self.data.commands.iter().find(|c| &c.path == path) {
+                        self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
+                            message: format!("Delete command '{}'?", cmd.name),
+                            purpose: ConfirmPurpose::DeleteCommand {
+                                path: path.clone(),
+                                name: cmd.name.clone(),
+                            },
+                        }));
+                    }
                 }
             }
             Panel::Agents => {
@@ -504,6 +521,18 @@ impl App {
                 }
                 self.set_message("Undo: restored skill".to_string());
                 self.data.skills = sources::skills::load(&self.paths);
+            }
+            UndoAction::Command { file_path, content } => {
+                if let Some(parent) = file_path.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                match std::fs::write(&file_path, &content) {
+                    Ok(()) => {
+                        self.set_message("Undo: restored command".to_string());
+                        self.data.commands = sources::commands::load(&self.paths);
+                    }
+                    Err(e) => self.set_message(format!("Undo failed: {e}")),
+                }
             }
             UndoAction::Agent { file_path, content } => {
                 if let Some(parent) = file_path.parent() {

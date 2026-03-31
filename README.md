@@ -43,7 +43,7 @@ Override paths for custom setups:
 lazyclaude --claude-dir ~/.claude --project-dir /path/to/project
 ```
 
-Available sources for `list`: `memory`, `skills`, `mcp`, `settings`, `hooks`, `claude-md`, `keybindings`, `agents`, `stats`, `plugins`, `todos`.
+Available sources for `list`: `memory`, `skills`, `commands`, `mcp`, `settings`, `hooks`, `claude-md`, `keybindings`, `agents`, `stats`, `plugins`, `todos`.
 
 ## Navigation
 
@@ -126,6 +126,89 @@ let data  = lazyclaude::sources::load_all(&paths);
 ```
 
 The `--json` flag and `list` subcommand output structured JSON, enabling integration with editor plugins, scripts, or other tools.
+
+## Claude Code File Layout
+
+lazyclaude reads configuration from the paths below. This is the canonical reference for what Claude Code stores and where.
+
+### Project Level
+
+```
+your-project/
+├── CLAUDE.md                         # Project instructions (or .claude/CLAUDE.md)
+├── .mcp.json                         # Project-scoped MCP servers
+└── .claude/
+    ├── CLAUDE.md                     # Alternative location for instructions
+    ├── settings.json                 # Project settings (committed)
+    ├── settings.local.json           # Local overrides (gitignored)
+    ├── rules/                        # Topic-specific rules (recursive)
+    │   └── **/*.md
+    ├── skills/                       # Skills (subdirectory + SKILL.md)
+    │   └── <name>/
+    │       └── SKILL.md
+    ├── agents/                       # Agents (flat .md files, NOT subdirectories)
+    │   └── <name>.md
+    └── commands/                     # Slash commands (legacy, prefer skills)
+        └── <name>.md
+```
+
+### User Level
+
+```
+~/.mcp.json                           # User-level MCP servers (cross-tool standard)
+~/.claude/
+├── CLAUDE.md                         # Personal instructions for all projects
+├── settings.json                     # User-wide settings
+├── keybindings.json                  # Keyboard shortcuts
+├── rules/                            # Personal rules (recursive)
+│   └── **/*.md
+├── skills/                           # User-level skills
+│   └── <name>/
+│       └── SKILL.md
+├── agents/                           # User-level agents (flat .md files)
+│   └── <name>.md
+├── commands/                         # User-level slash commands (legacy)
+│   └── <name>.md
+├── plugins/                          # Installed plugins
+│   ├── installed_plugins.json
+│   ├── blocklist.json
+│   └── known_marketplaces.json
+├── todos/                            # Todo items from sessions
+│   └── *.json
+├── stats-cache.json                  # Usage statistics
+└── projects/
+    └── <encoded-path>/               # Per-project data
+        ├── *.jsonl                   # Session transcripts
+        └── memory/
+            ├── MEMORY.md             # Memory index
+            └── *.md                  # Memory topic files
+```
+
+### Organization Level (managed, read-only)
+
+```
+macOS:     /Library/Application Support/ClaudeCode/CLAUDE.md
+Linux/WSL: /etc/claude-code/CLAUDE.md
+```
+
+### Settings Merge Order
+
+Settings are merged with increasing priority: **user < project < local**. Permissions use a three-tier evaluation: **deny > ask > allow** (first match wins).
+
+### Hooks
+
+Hooks are configured inside `settings.json` under the `hooks` key (not a separate file). They are available at all three settings scopes (user, project, local).
+
+### Key Differences
+
+| Item | Format | Location |
+|------|--------|----------|
+| Skills | Subdirectory with `SKILL.md` | `.claude/skills/<name>/` |
+| Agents | Flat `.md` file | `.claude/agents/<name>.md` |
+| Commands | Flat `.md` file (legacy) | `.claude/commands/<name>.md` |
+| MCP | JSON with `mcpServers` key | `~/.mcp.json` or `.mcp.json` |
+| Hooks | JSON inside `settings.json` | `hooks` key in settings |
+| Memory | Auto-generated per project | `~/.claude/projects/<encoded>/memory/` |
 
 ## Releasing
 
