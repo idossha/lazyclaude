@@ -1,0 +1,22 @@
+[
+  {
+    "id": "todo-1",
+    "content": "Add rate limiting to public API endpoints",
+    "status": "completed"
+  },
+  {
+    "id": "todo-2",
+    "content": "Migrate users endpoint to cursor-based pagination",
+    "status": "in_progress"
+  },
+  {
+    "id": "todo-3",
+    "content": "Write e2e tests for the authentication flow",
+    "status": "pending"
+  },
+  {
+    "id": "todo-4",
+    "content": "Update API docs for v2 endpoints",
+    "status": "pending"
+  }
+]

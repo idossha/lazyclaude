@@ -1,0 +1,20 @@
+{
+  "plugins": {
+    "claude-test-runner": [
+      {
+        "version": "1.2.0",
+        "scope": "user",
+        "installedAt": "2026-03-15T10:30:00Z",
+        "marketplace": "npm"
+      }
+    ],
+    "claude-docker-helper": [
+      {
+        "version": "0.8.1",
+        "scope": "project",
+        "installedAt": "2026-03-20T14:22:00Z",
+        "marketplace": "npm"
+      }
+    ]
+  }
+}

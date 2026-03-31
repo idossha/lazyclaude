@@ -1,3 +1,7 @@
 target/
 idos/
 .claude/
+
+# Demo: ignore generated encoded project dirs and GIF output
+demo/claude-home/projects/-Users-*
+demo/*.gif

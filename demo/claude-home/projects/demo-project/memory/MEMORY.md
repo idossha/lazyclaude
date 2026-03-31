@@ -1,0 +1,3 @@
+- [User Profile](user_profile.md) -- Senior full-stack developer, prefers concise responses
+- [API Architecture](api_architecture.md) -- REST API design decisions and migration plan
+- [Testing Strategy](testing_strategy.md) -- Integration tests hit real DB, no mocks for data layer

@@ -30,18 +30,20 @@ impl App {
                 if col < panel_width {
                     // Clicked in panels area
                     self.focus = Focus::Panels;
-                    // Map row to panel index (subtract border rows)
-                    let panel_idx = row.saturating_sub(2) as usize; // 2 for top border + title
+                    let panel_idx = row.saturating_sub(2) as usize;
                     if panel_idx < PANELS.len() {
                         self.active_panel = PANELS[panel_idx];
                         self.detail_scroll = 0;
                     }
+                } else if self.active_panel == Panel::Stats {
+                    // Stats panel: check heatmap hit
+                    self.focus = Focus::Detail;
+                    self.try_heatmap_click(col, row);
                 } else {
                     // Clicked in detail area
                     if self.focus == Focus::Panels {
                         self.focus = Focus::Detail;
                     }
-                    // Map row to item index
                     let item_idx = row.saturating_sub(2) as usize;
                     let max = self.active_panel.count(self);
                     let idx = self.active_panel.index();
@@ -52,6 +54,34 @@ impl App {
                 }
             }
             _ => {}
+        }
+    }
+
+    fn try_heatmap_click(&mut self, col: u16, row: u16) {
+        let (ox, oy) = self.stats_heatmap_origin;
+        let n_cols = self.stats_heatmap_cols as usize;
+        let base_w = self.stats_heatmap_base_w as usize;
+        let extra = self.stats_heatmap_extra as usize;
+        if n_cols == 0 || base_w == 0 || col < ox || row < oy {
+            return;
+        }
+        let grid_row = (row - oy) as usize;
+        // Map x to column: first `extra` cols are (base_w+1) wide, rest are base_w
+        let dx = (col - ox) as usize;
+        let wide_zone = extra * (base_w + 1);
+        let grid_col = if dx < wide_zone {
+            dx / (base_w + 1)
+        } else {
+            extra + (dx - wide_zone) / base_w
+        };
+        if grid_row >= 7 || grid_col >= n_cols {
+            return;
+        }
+        let idx = grid_row * n_cols + grid_col;
+        if let Some(date) = self.stats_heatmap_grid.get(idx) {
+            if !date.is_empty() {
+                self.stats_selected_date.clone_from(date);
+            }
         }
     }
 }

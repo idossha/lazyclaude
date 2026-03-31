@@ -1,0 +1,17 @@
+[
+  {
+    "key": "ctrl+s",
+    "command": "submit",
+    "context": "Chat"
+  },
+  {
+    "key": "ctrl+k",
+    "command": "clear",
+    "context": "Chat"
+  },
+  {
+    "key": "ctrl+r",
+    "command": "retry",
+    "context": "Chat"
+  }
+]

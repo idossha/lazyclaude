@@ -512,6 +512,16 @@ pub struct App {
     pub item_paths: Vec<Option<PathBuf>>,
     pub item_bodies: Vec<Option<String>>,
 
+    // Stats heatmap navigation
+    pub stats_selected_date: String,
+    /// Grid dates for heatmap: flat vec, 7 rows × N cols (row-major).
+    /// Set by the renderer each frame so mouse clicks can map to dates.
+    pub stats_heatmap_grid: Vec<String>,
+    pub stats_heatmap_origin: (u16, u16), // (x, y) of first cell on screen
+    pub stats_heatmap_cols: u16,
+    pub stats_heatmap_base_w: u16,
+    pub stats_heatmap_extra: u16, // first `extra` cols are base_w+1
+
     // Undo stack for destructive operations (capped at 20)
     pub undo_stack: Vec<UndoAction>,
 
@@ -526,6 +536,13 @@ impl App {
         let claude_dir = paths.claude_dir.clone();
         let projects = sources::load_projects(&paths);
         let data = sources::load_all(&paths);
+
+        let stats_selected_date = data
+            .stats
+            .daily_activity
+            .last()
+            .map(|d| d.date.clone())
+            .unwrap_or_default();
 
         // Set up file-system watcher for auto-refresh
         let (watcher, watch_rx) = Self::init_watcher(&paths);
@@ -550,6 +567,12 @@ impl App {
             search_receiver: None,
             search_source_pending: None,
             skills_registry_cache: None,
+            stats_selected_date,
+            stats_heatmap_grid: Vec::new(),
+            stats_heatmap_origin: (0, 0),
+            stats_heatmap_cols: 0,
+            stats_heatmap_base_w: 1,
+            stats_heatmap_extra: 0,
             pending_edit: None,
             item_paths: Vec::new(),
             item_bodies: Vec::new(),

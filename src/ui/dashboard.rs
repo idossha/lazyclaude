@@ -148,7 +148,7 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
             .title(Span::styled(" Stats ", Style::default().fg(Color::Cyan)));
         let inner = block.inner(area);
         frame.render_widget(block, area);
-        render_stats_dashboard(frame, &app.data.stats, inner);
+        render_stats_dashboard(frame, app, inner);
         return;
     }
 

@@ -1,0 +1,3 @@
+{"role":"user","content":"Fix the CORS error on the staging environment"}
+{"role":"assistant","content":"Let me check the CORS configuration. The issue is likely that the staging origin isn't in the allowed list."}
+{"role":"user","content":"Yes, staging.acme.io needs to be added"}

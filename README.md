@@ -2,6 +2,19 @@
 
 A lazygit-inspired TUI for managing Claude Code configuration. One place to view and edit memory, skills, MCP servers, permissions, hooks, instructions, keybindings, agents, sessions, stats, plugins, and todos — across user and project scopes.
 
+<!-- ![lazyclaude demo](demo/lazyclaude-demo.gif) -->
+
+## Demo
+
+Try lazyclaude with the included sample project:
+
+```sh
+./demo/setup.sh
+cargo run -- --claude-dir demo/claude-home --project-dir demo/project
+```
+
+The demo populates all 11 panels with realistic config: CLAUDE.md, rules, skills, agents, commands, MCP servers, settings with permissions/hooks/keybindings, memory files, sessions, stats, plugins, and todos.
+
 ## Install
 
 ### Prebuilt binaries (recommended)
