@@ -51,32 +51,27 @@ fn build_permissions(
     local_: &serde_json::Value,
 ) -> Permissions {
     let mut allow = Vec::new();
+    let mut ask = Vec::new();
     let mut deny = Vec::new();
 
     let mut collect = |scope: Scope, data: &serde_json::Value| {
         if let Some(perms) = data.get("permissions").and_then(|v| v.as_object()) {
-            if let Some(allow_arr) = perms.get("allow").and_then(|v| v.as_array()) {
-                for rule in allow_arr {
-                    let rule_str = match rule {
-                        serde_json::Value::String(s) => s.clone(),
-                        _ => rule.to_string(),
-                    };
-                    allow.push(PermissionRule {
-                        rule: rule_str,
-                        scope,
-                    });
-                }
-            }
-            if let Some(deny_arr) = perms.get("deny").and_then(|v| v.as_array()) {
-                for rule in deny_arr {
-                    let rule_str = match rule {
-                        serde_json::Value::String(s) => s.clone(),
-                        _ => rule.to_string(),
-                    };
-                    deny.push(PermissionRule {
-                        rule: rule_str,
-                        scope,
-                    });
+            for (kind, target) in [
+                ("allow", &mut allow),
+                ("ask", &mut ask),
+                ("deny", &mut deny),
+            ] {
+                if let Some(arr) = perms.get(kind).and_then(|v| v.as_array()) {
+                    for rule in arr {
+                        let rule_str = match rule {
+                            serde_json::Value::String(s) => s.clone(),
+                            _ => rule.to_string(),
+                        };
+                        target.push(PermissionRule {
+                            rule: rule_str,
+                            scope,
+                        });
+                    }
                 }
             }
         }
@@ -86,7 +81,7 @@ fn build_permissions(
     collect(Scope::Project, project);
     collect(Scope::Local, local_);
 
-    Permissions { allow, deny }
+    Permissions { allow, ask, deny }
 }
 
 /// Add a permission rule to a scope

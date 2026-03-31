@@ -65,7 +65,7 @@ fn render_panels(frame: &mut Frame, app: &mut App, area: Rect) {
     let items: Vec<ListItem> = PANELS
         .iter()
         .map(|panel| {
-            let count = panel.count(app);
+            let count = panel.item_count(app);
             let key = panel.key_label();
             let label = if *panel == Panel::Stats {
                 format!("  {} {}", key, panel.label())
@@ -152,9 +152,9 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
-    let count = panel.count(app);
+    let item_count = panel.item_count(app);
     let title = if app.filter.is_empty() {
-        format!(" {} — {} items ", panel.label(), count)
+        format!(" {} — {} items ", panel.label(), item_count)
     } else {
         format!(" {} — filter: \"{}\" ", panel.label(), app.filter)
     };

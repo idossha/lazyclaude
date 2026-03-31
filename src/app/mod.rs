@@ -29,8 +29,8 @@ pub enum UndoAction {
         files: Vec<(PathBuf, Vec<u8>)>,
     },
     Agent {
-        dir_path: PathBuf,
-        files: Vec<(PathBuf, Vec<u8>)>,
+        file_path: PathBuf,
+        content: String,
     },
     McpServer {
         scope: Scope,
@@ -128,6 +128,30 @@ impl Panel {
 
     pub fn from_index(i: usize) -> Option<Panel> {
         PANELS.get(i).copied()
+    }
+
+    /// Returns the actual data item count for display in the panel list.
+    /// Excludes scope headers, "none" placeholders, and other UI chrome.
+    pub fn item_count(&self, app: &App) -> usize {
+        match self {
+            Panel::Projects => app.projects.len(),
+            Panel::Config => app.data.claude_md.len(),
+            Panel::Memory => app.data.memory.files.len(),
+            Panel::Skills => app.data.skills.len(),
+            Panel::Agents => app.data.agents.len(),
+            Panel::Mcp => app.data.mcp.project.len() + app.data.mcp.user.len(),
+            Panel::Settings => {
+                let perms = &app.data.settings.permissions;
+                perms.allow.len() + perms.ask.len() + perms.deny.len()
+            }
+            Panel::Sessions => app.data.sessions.len(),
+            Panel::Stats => 0,
+            Panel::Plugins => {
+                let p = &app.data.plugins;
+                p.installed.len() + p.blocked.len()
+            }
+            Panel::Todos => app.data.todos.len(),
+        }
     }
 
     /// Returns the number of rendered rows in the detail list.
@@ -228,6 +252,9 @@ impl Panel {
                 let mut n = 0;
                 if !perms.allow.is_empty() {
                     n += 1 + perms.allow.len();
+                }
+                if !perms.ask.is_empty() {
+                    n += 1 + perms.ask.len();
                 }
                 if !perms.deny.is_empty() {
                     n += 1 + perms.deny.len();

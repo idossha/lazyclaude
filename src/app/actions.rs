@@ -70,29 +70,24 @@ impl App {
             }
             InputPurpose::CreateAgent => {
                 if !value.is_empty() {
-                    let dir = self.paths.user_agents_dir().join(&value);
-                    if dir.exists() {
+                    // Agents are flat .md files: ~/.claude/agents/<name>.md
+                    let agents_dir = self.paths.user_agents_dir();
+                    let agent_md = agents_dir.join(format!("{}.md", value));
+                    if agent_md.exists() {
                         self.set_message(format!("Agent '{}' already exists", value));
+                    } else if let Err(e) = std::fs::create_dir_all(&agents_dir) {
+                        self.set_message(format!("Error: {}", e));
                     } else {
-                        match std::fs::create_dir_all(&dir) {
-                            Ok(()) => {
-                                let agent_md = dir.join("AGENT.md");
-                                let template = format!(
-                                    "---\nname: {}\ndescription: \n---\n\n# {}\n\nAdd your agent instructions here.\n",
-                                    value, value
-                                );
-                                if let Err(e) = std::fs::write(&agent_md, template) {
-                                    self.set_message(format!("Error: {}", e));
-                                } else {
-                                    self.set_message(format!(
-                                        "Created agent '{}' — opening editor",
-                                        value
-                                    ));
-                                    self.data.agents = sources::agents::load(&self.paths);
-                                    self.pending_edit = Some(agent_md);
-                                }
-                            }
-                            Err(e) => self.set_message(format!("Error: {}", e)),
+                        let template = format!(
+                            "---\nname: {}\ndescription: \nmodel: sonnet\n---\n\nAdd your agent instructions here.\n",
+                            value
+                        );
+                        if let Err(e) = std::fs::write(&agent_md, template) {
+                            self.set_message(format!("Error: {}", e));
+                        } else {
+                            self.set_message(format!("Created agent '{}' — opening editor", value));
+                            self.data.agents = sources::agents::load(&self.paths);
+                            self.pending_edit = Some(agent_md);
                         }
                     }
                 }
@@ -105,10 +100,11 @@ impl App {
             ConfirmPurpose::DeletePermission { scope, kind, index } => {
                 // Resolve rule text for undo before deleting
                 let perms = &self.data.settings.permissions;
-                let rules = if kind == "allow" {
-                    &perms.allow
-                } else {
-                    &perms.deny
+                let rules = match kind.as_str() {
+                    "allow" => &perms.allow,
+                    "ask" => &perms.ask,
+                    "deny" => &perms.deny,
+                    _ => &perms.deny,
                 };
                 let rule_text = rules.get(index).map(|r| r.rule.clone()).unwrap_or_default();
                 if let Err(e) =
@@ -218,28 +214,16 @@ impl App {
                 }
             }
             ConfirmPurpose::DeleteAgent { path, name } => {
-                // Save all files in the agent directory before removing for undo
-                let mut saved_files = Vec::new();
-                let dir_path = path.parent().map(|d| d.to_path_buf());
-                if let Some(ref dir) = dir_path {
-                    if let Ok(entries) = std::fs::read_dir(dir) {
-                        for entry in entries.flatten() {
-                            if let Ok(data) = std::fs::read(entry.path()) {
-                                saved_files.push((entry.path(), data));
-                            }
-                        }
-                    }
-                }
+                // Save the agent file content before removing for undo
+                let content = std::fs::read_to_string(&path).unwrap_or_default();
                 if let Err(e) = sources::agents::remove(&path) {
                     tracing::error!("Failed to delete agent '{}': {}", name, e);
                     self.set_message(format!("Error: {e}"));
                 } else {
-                    if let Some(dir) = dir_path {
-                        self.push_undo(UndoAction::Agent {
-                            dir_path: dir,
-                            files: saved_files,
-                        });
-                    }
+                    self.push_undo(UndoAction::Agent {
+                        file_path: path.clone(),
+                        content,
+                    });
                     self.set_message(format!("Deleted: {name}"));
                     self.data.agents = sources::agents::load(&self.paths);
                 }
@@ -521,13 +505,17 @@ impl App {
                 self.set_message("Undo: restored skill".to_string());
                 self.data.skills = sources::skills::load(&self.paths);
             }
-            UndoAction::Agent { dir_path, files } => {
-                let _ = std::fs::create_dir_all(&dir_path);
-                for (file_path, data) in &files {
-                    let _ = std::fs::write(file_path, data);
+            UndoAction::Agent { file_path, content } => {
+                if let Some(parent) = file_path.parent() {
+                    let _ = std::fs::create_dir_all(parent);
                 }
-                self.set_message("Undo: restored agent".to_string());
-                self.data.agents = sources::agents::load(&self.paths);
+                match std::fs::write(&file_path, &content) {
+                    Ok(()) => {
+                        self.set_message("Undo: restored agent".to_string());
+                        self.data.agents = sources::agents::load(&self.paths);
+                    }
+                    Err(e) => self.set_message(format!("Undo failed: {e}")),
+                }
             }
             UndoAction::McpServer {
                 scope,

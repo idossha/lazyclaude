@@ -26,10 +26,11 @@ impl App {
         let scope = parse_scope(parts[2])?;
         let rule_index: usize = parts[3].parse().ok()?;
         let perms = &self.data.settings.permissions;
-        let rules = if kind == "allow" {
-            &perms.allow
-        } else {
-            &perms.deny
+        let rules = match kind.as_str() {
+            "allow" => &perms.allow,
+            "ask" => &perms.ask,
+            "deny" => &perms.deny,
+            _ => return None,
         };
         let rule_text = rules.get(rule_index).map(|r| r.rule.clone())?;
         Some((kind, scope, rule_index, rule_text))

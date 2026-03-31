@@ -25,10 +25,10 @@ pub fn load(paths: &Paths) -> Vec<ClaudeMdFile> {
     let rules_dir = paths.project_root.join(".claude").join("rules");
     scan_rules_dir(&mut files, &rules_dir, Scope::Project);
 
-    // User-level CLAUDE.md
+    // User-level CLAUDE.md (~/.claude/CLAUDE.md)
     check_file(
         &mut files,
-        paths.home_dir.join("CLAUDE.md"),
+        paths.claude_dir.join("CLAUDE.md"),
         Scope::User,
         "claude_md",
     );
@@ -41,12 +41,17 @@ pub fn load(paths: &Paths) -> Vec<ClaudeMdFile> {
 }
 
 fn scan_rules_dir(files: &mut Vec<ClaudeMdFile>, dir: &PathBuf, scope: Scope) {
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().map(|e| e == "md").unwrap_or(false) {
-                check_file(files, path, scope, "rule");
-            }
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            // Recurse into subdirectories (e.g. rules/frontend/, rules/backend/)
+            scan_rules_dir(files, &path, scope);
+        } else if path.extension().map(|e| e == "md").unwrap_or(false) {
+            check_file(files, path, scope, "rule");
         }
     }
 }

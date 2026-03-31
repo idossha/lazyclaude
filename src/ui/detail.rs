@@ -295,6 +295,37 @@ pub(crate) fn build_detail_items(
                     )));
                 }
             }
+            if !perms.ask.is_empty() {
+                items.push(ListItem::new(Line::from(Span::styled(
+                    "  Ask",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ))));
+                paths.push(None);
+                bodies.push(None);
+                for (i, rule) in perms.ask.iter().enumerate() {
+                    if !matches(&rule.rule) {
+                        continue;
+                    }
+                    items.push(ListItem::new(Line::from(vec![
+                        Span::styled("    ", Style::default()),
+                        Span::styled(rule.rule.clone(), Style::default().fg(Color::White)),
+                        Span::styled(
+                            format!("  [{}]", rule.scope),
+                            Style::default().fg(Color::Yellow),
+                        ),
+                    ])));
+                    paths.push(Some(PathBuf::from(format!(
+                        "perm:ask:{}:{}",
+                        rule.scope, i
+                    ))));
+                    bodies.push(Some(format!(
+                        "# Ask Permission\n\nRule: {}\nScope: {}\n\n---\n\nThis rule is defined in the {} settings.\nEvaluation order: deny > ask > allow (first match wins).",
+                        rule.rule, rule.scope, rule.scope
+                    )));
+                }
+            }
             if !perms.deny.is_empty() {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  Deny",

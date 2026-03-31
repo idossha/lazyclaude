@@ -52,9 +52,19 @@ impl Paths {
     }
 
     /// Encode a project path to Claude Code's directory name format.
-    /// /Users/foo/myproject -> -Users-foo-myproject
+    /// Claude Code replaces all non-alphanumeric characters with hyphens.
+    /// /Users/foo/my_project -> -Users-foo-my-project
+    /// /Users/foo/cc.nvim    -> -Users-foo-cc-nvim
     pub fn encode_project_path(path: &str) -> String {
-        path.replace('/', "-")
+        path.chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '-'
+                }
+            })
+            .collect()
     }
 
     /// Project config dir: ~/.claude/projects/<encoded-path>

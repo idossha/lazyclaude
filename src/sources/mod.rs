@@ -176,6 +176,7 @@ pub struct SettingsScopes {
 #[derive(Default, Clone, serde::Serialize)]
 pub struct Permissions {
     pub allow: Vec<PermissionRule>,
+    pub ask: Vec<PermissionRule>,
     pub deny: Vec<PermissionRule>,
 }
 
@@ -223,7 +224,7 @@ pub fn load_all(paths: &crate::config::Paths) -> SourceData {
         claude_md: claude_md::load(paths),
         keybindings: keybindings::load(paths),
         agents: agents::load(paths),
-        sessions: Vec::new(),
+        sessions: sessions::load_sessions(&paths.project_config_dir()),
         stats: stats::load(paths),
         plugins: plugins::load(paths),
         todos: todos::load(paths),

@@ -129,17 +129,17 @@ fn test_agents_dual_scope() {
     let project_root = TempDir::new().unwrap();
     let paths = make_paths(&claude_dir, &project_root);
 
-    // User-level agent: ~/.claude/agents/my-agent/AGENT.md
+    // User-level agent: ~/.claude/agents/my-agent.md (flat file)
     write_fixture(
         claude_dir.path(),
-        "agents/my-agent/AGENT.md",
+        "agents/my-agent.md",
         "---\nname: My Agent\ndescription: A user agent\nmodel: opus\n---\nAgent instructions.",
     );
 
-    // Project-level agent: <project>/.claude/agents/proj-agent/AGENT.md
+    // Project-level agent: <project>/.claude/agents/proj-agent.md (flat file)
     write_fixture(
         project_root.path(),
-        ".claude/agents/proj-agent/AGENT.md",
+        ".claude/agents/proj-agent.md",
         "---\nname: Proj Agent\ndescription: A project agent\nmodel: sonnet\n---\nProject agent.",
     );
 
@@ -175,7 +175,7 @@ fn test_agents_name_defaults_to_dir_name() {
 
     write_fixture(
         claude_dir.path(),
-        "agents/fallback-name/AGENT.md",
+        "agents/fallback-name.md",
         "---\ndescription: no name\nmodel: haiku\n---\nBody.",
     );
 
@@ -524,8 +524,8 @@ fn test_claude_md_all_locations() {
         "# Test rule",
     );
 
-    // 4) User-level CLAUDE.md (parent of claude_dir = wrapper dir, simulating ~/)
-    write_fixture(wrapper.path(), "CLAUDE.md", "# User CLAUDE");
+    // 4) User-level CLAUDE.md (~/.claude/CLAUDE.md)
+    write_fixture(&claude_dir, "CLAUDE.md", "# User CLAUDE");
 
     // 5) User-level rules (~/.claude/rules/user-rule.md)
     write_fixture(&claude_dir, "rules/user-rule.md", "# User rule");
@@ -795,6 +795,16 @@ fn test_paths_encode_project_path() {
         Paths::encode_project_path("/home/user/code/app"),
         "-home-user-code-app"
     );
+    // Underscores are replaced with hyphens
+    assert_eq!(
+        Paths::encode_project_path("/Users/idohaber/00_development/lazyclaude"),
+        "-Users-idohaber-00-development-lazyclaude"
+    );
+    // Dots are replaced with hyphens
+    assert_eq!(
+        Paths::encode_project_path("/Users/idohaber/00_development/cc.nvim"),
+        "-Users-idohaber-00-development-cc-nvim"
+    );
 }
 
 #[test]
@@ -902,7 +912,7 @@ fn test_load_all_integration() {
     // --- Agents ---
     write_fixture(
         &claude_dir,
-        "agents/test-agent/AGENT.md",
+        "agents/test-agent.md",
         "---\nname: Test Agent\ndescription: test agent\nmodel: opus\n---\nAgent body.",
     );
 
@@ -1128,7 +1138,7 @@ fn test_skills_non_directory_entries_ignored() {
 }
 
 #[test]
-fn test_agents_non_directory_entries_ignored() {
+fn test_agents_non_md_files_ignored() {
     let claude_dir = TempDir::new().unwrap();
     let project_root = TempDir::new().unwrap();
     let paths = make_paths(&claude_dir, &project_root);
@@ -1136,7 +1146,7 @@ fn test_agents_non_directory_entries_ignored() {
     write_fixture(claude_dir.path(), "agents/stray-file.txt", "Not an agent");
     write_fixture(
         claude_dir.path(),
-        "agents/real-agent/AGENT.md",
+        "agents/real-agent.md",
         "---\nname: Real Agent\nmodel: opus\n---\nBody.",
     );
 
@@ -1263,12 +1273,12 @@ fn test_agents_sorted_by_name() {
 
     write_fixture(
         claude_dir.path(),
-        "agents/zeta/AGENT.md",
+        "agents/zeta.md",
         "---\nname: Zeta\nmodel: opus\n---\nZ.",
     );
     write_fixture(
         claude_dir.path(),
-        "agents/alpha/AGENT.md",
+        "agents/alpha.md",
         "---\nname: Alpha\nmodel: opus\n---\nA.",
     );
 
