@@ -2,7 +2,7 @@
 
 A lazygit-inspired TUI for managing Claude Code configuration. One place to view and edit memory, skills, MCP servers, permissions, hooks, instructions, keybindings, agents, sessions, stats, plugins, and todos — across user and project scopes.
 
-<!-- ![lazyclaude demo](demo/lazyclaude-demo.gif) -->
+![lazyclaude demo](demo/lazyclaude-demo.gif)
 
 ## Demo
 

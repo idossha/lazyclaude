@@ -3,6 +3,5 @@ idos/
 .claude/
 .DS_Store
 
-# Demo: ignore generated encoded project dirs and GIF output
+# Demo: ignore generated encoded project dirs
 demo/claude-home/projects/-Users-*
-demo/*.gif
