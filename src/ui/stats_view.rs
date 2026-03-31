@@ -251,10 +251,7 @@ fn render_heatmap(frame: &mut Frame, app: &mut App, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::DarkGray))
-        .title(Span::styled(
-            " Activity ",
-            Style::default().fg(Color::Cyan),
-        ));
+        .title(Span::styled(" Activity ", Style::default().fg(Color::Cyan)));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -451,14 +448,7 @@ fn render_heatmap(frame: &mut Frame, app: &mut App, area: Rect) {
 // ── Activity by Hour ────────────────────────────────────────────────
 
 const EIGHTH_BLOCKS: [char; 9] = [
-    ' ',
-    '\u{2581}',
-    '\u{2582}',
-    '\u{2583}',
-    '\u{2584}',
-    '\u{2585}',
-    '\u{2586}',
-    '\u{2587}',
+    ' ', '\u{2581}', '\u{2582}', '\u{2583}', '\u{2584}', '\u{2585}', '\u{2586}', '\u{2587}',
     '\u{2588}',
 ];
 

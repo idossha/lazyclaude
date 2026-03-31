@@ -87,5 +87,4 @@ impl App {
         self.skills_registry_cache = None; // Force re-fetch on next search
         self.set_message("Refreshed".to_string());
     }
-
 }
