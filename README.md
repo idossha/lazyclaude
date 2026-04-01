@@ -4,26 +4,12 @@ A lazygit-inspired TUI for managing Claude Code configuration. One place to view
 
 ![lazyclaude demo](demo/lazyclaude-demo.gif)
 
-## Demo
-
-Try lazyclaude with the included sample project:
-
-```sh
-./demo/setup.sh
-cargo run -- --claude-dir demo/claude-home --project-dir demo/project
-```
-
-The demo populates all 11 panels with realistic config: CLAUDE.md, rules, skills, agents, commands, MCP servers, settings with permissions/hooks/keybindings, memory files, sessions, stats, plugins, and todos.
-
 ## Install
 
-### Prebuilt binaries (recommended)
-
-Download the latest release for your platform from [GitHub Releases](https://github.com/idohaber/lazyclaude/releases/latest), then:
+### Homebrew (recommended)
 
 ```sh
-tar xzf lazyclaude-*.tar.gz
-sudo install lazyclaude-*/lazyclaude /usr/local/bin/
+brew install idossha/lazyclaude/lazyclaude
 ```
 
 ### From crates.io
@@ -32,10 +18,19 @@ sudo install lazyclaude-*/lazyclaude /usr/local/bin/
 cargo install lazyclaude
 ```
 
+### Prebuilt binaries
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/idossha/lazyclaude/releases/latest), then:
+
+```sh
+tar xzf lazyclaude-*.tar.gz
+sudo install lazyclaude-*/lazyclaude /usr/local/bin/
+```
+
 ### From source
 
 ```sh
-git clone https://github.com/idohaber/lazyclaude.git
+git clone https://github.com/idossha/lazyclaude.git
 cd lazyclaude
 cargo install --path .
 ```
@@ -85,7 +80,7 @@ Mouse support: click to select panels/items, scroll wheel to navigate.
 | `a` | Add / create item (Settings/MCP/Skills/Agents) |
 | `d` | Delete item |
 | `u` | Undo last delete |
-| `D` | Add deny permission (Settings) |
+| `D` | Deny selected permission (Settings) |
 | `t` | Toggle server (MCP) |
 | `s` | Search registry (Skills/MCP/Plugins) |
 | `y` | Copy to clipboard |
@@ -102,7 +97,7 @@ Press `s` on Skills, MCP, or Plugins to open a search overlay:
 - `Esc` to close
 - Items already installed show a checkmark
 
-Skills are sourced from [anthropics/skills](https://github.com/anthropics/skills). MCP packages are sourced from npm.
+Skills are sourced from [anthropics/skills](https://github.com/anthropics/skills) and [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills). MCP servers are sourced from the [official MCP registry](https://registry.modelcontextprotocol.io), [npm](https://www.npmjs.com), and [Smithery](https://smithery.ai). Plugins are sourced from local marketplaces and [claude-plugins-official](https://github.com/anthropics/claude-plugins-official).
 
 ## Panels
 
@@ -228,11 +223,11 @@ Hooks are configured inside `settings.json` under the `hooks` key (not a separat
 Tag a version to trigger a release build:
 
 ```sh
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.x.y
+git push origin v0.x.y
 ```
 
-GitHub Actions builds binaries for macOS (x86_64, aarch64) and Linux (x86_64, aarch64), then publishes them as a GitHub Release.
+GitHub Actions builds binaries for macOS (x86_64, aarch64) and Linux (x86_64, aarch64), publishes them as a GitHub Release, and automatically updates the [Homebrew formula](https://github.com/idossha/homebrew-lazyclaude).
 
 ## License
 
