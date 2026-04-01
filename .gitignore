@@ -2,6 +2,7 @@ target/
 idos/
 .claude/
 .DS_Store
+CLAUDE.md
 
 # Demo: ignore generated encoded project dirs
 demo/claude-home/projects/-Users-*
