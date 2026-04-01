@@ -416,13 +416,8 @@ fn render_heatmap(frame: &mut Frame, app: &mut App, area: Rect) {
                 .map(|&i| stats.daily_activity[i].messages)
                 .unwrap_or(0);
 
-            let is_selected = date == app.stats_selected_date;
             let level = heat_level(msgs, &qthresh);
-            let fg = if is_selected {
-                Color::White
-            } else {
-                HEAT_COLORS[level]
-            };
+            let fg = HEAT_COLORS[level];
 
             let x = col_x[col];
             let w = col_w[col];
