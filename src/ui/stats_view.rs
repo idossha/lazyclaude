@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use crate::app::App;
-use lazyclaude::sources::stats::{self, StatsData};
+use lazyclaude::sources::stats::{self, StatsData, StatsPeriod};
 
 // ── Heat-map color palette (5 levels, GitHub-style) ─────────────────
 
@@ -61,6 +61,15 @@ const MONTH_ABBR: [&str; 12] = [
 ];
 const DAY_LABELS: [&str; 7] = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
+const MODEL_COLORS: [Color; 6] = [
+    Color::Cyan,
+    Color::Green,
+    Color::Yellow,
+    Color::Magenta,
+    Color::Blue,
+    Color::Red,
+];
+
 // ── Main entry point ────────────────────────────────────────────────
 
 pub(crate) fn render_stats_dashboard(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -83,58 +92,122 @@ pub(crate) fn render_stats_dashboard(frame: &mut Frame, app: &mut App, area: Rec
         return;
     }
 
+    let has_tokens_chart = !app.data.stats.daily_model_tokens.is_empty();
     let has_hourly = app.data.stats.hour_counts.iter().any(|&c| c > 0);
-    let top_h = (app.data.stats.model_usage.len() as u16 + 2).max(5);
-    // Heatmap: 2 borders + 1 month labels + 7 grid rows + 1 legend = 11
+    let top_h = (app.data.stats.model_usage.len() as u16 + 2).max(7);
     let heatmap_h: u16 = 11;
 
     let chunks = Layout::vertical([
-        Constraint::Length(top_h),
-        Constraint::Length(heatmap_h),
-        Constraint::Fill(1),
+        Constraint::Length(1),         // period tabs
+        Constraint::Length(top_h),     // summary (overview + models)
+        Constraint::Length(heatmap_h), // heatmap
+        Constraint::Fill(1),           // tokens chart or hourly fallback
     ])
     .split(area);
 
-    render_top_row(frame, &app.data.stats, chunks[0]);
-    render_heatmap(frame, app, chunks[1]);
-    if has_hourly {
-        render_hourly(frame, &app.data.stats, chunks[2]);
+    render_period_tabs(frame, app.stats_period, chunks[0]);
+    render_summary(frame, app, chunks[1]);
+    render_heatmap(frame, app, chunks[2]);
+    if has_tokens_chart {
+        render_tokens_chart(frame, app, chunks[3]);
+    } else if has_hourly {
+        render_hourly(frame, &app.data.stats, chunks[3]);
     }
 }
 
-// ── Top row: Overview (left) + Tokens by Model (right) ──────────────
+// ── Period tabs ─────────────────────────────────────────────────────
 
-fn render_top_row(frame: &mut Frame, stats: &StatsData, area: Rect) {
+fn render_period_tabs(frame: &mut Frame, period: StatsPeriod, area: Rect) {
+    let periods = [
+        StatsPeriod::AllTime,
+        StatsPeriod::Last7Days,
+        StatsPeriod::Last30Days,
+    ];
+    let active = Style::default()
+        .fg(Color::Cyan)
+        .add_modifier(Modifier::BOLD);
+    let dim = Style::default().fg(Color::DarkGray);
+
+    let mut spans: Vec<Span> = vec![Span::styled("  ", Style::default())];
+    for (i, &p) in periods.iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::styled("  ", Style::default()));
+        }
+        let style = if p == period { active } else { dim };
+        spans.push(Span::styled(p.label(), style));
+    }
+
+    frame.render_widget(Paragraph::new(Line::from(spans)), area);
+}
+
+// ── Summary: Overview (left) + Models (right) ───────────────────────
+
+fn render_summary(frame: &mut Frame, app: &mut App, area: Rect) {
+    let stats = &app.data.stats;
+    let (start, end) = app.stats_period.date_range();
+    let summary = stats::compute_summary(stats, start.as_deref(), end.as_deref());
+
     if stats.model_usage.is_empty() {
-        render_overview(frame, stats, area);
+        render_overview(frame, stats, &summary, area);
         return;
     }
     let cols =
         Layout::horizontal([Constraint::Percentage(55), Constraint::Percentage(45)]).split(area);
-    render_overview(frame, stats, cols[0]);
-    render_models(frame, stats, cols[1]);
+    render_overview(frame, stats, &summary, cols[0]);
+    render_models(frame, stats, &summary, cols[1]);
 }
 
-fn render_overview(frame: &mut Frame, stats: &StatsData, area: Rect) {
+fn render_overview(
+    frame: &mut Frame,
+    stats: &StatsData,
+    summary: &stats::StatsSummary,
+    area: Rect,
+) {
     let bold = Style::default()
         .fg(Color::White)
         .add_modifier(Modifier::BOLD);
     let dim = Style::default().fg(Color::DarkGray);
+    let yellow = Style::default().fg(Color::Yellow);
 
     let mut lines = vec![
         Line::from(vec![
             Span::styled("  ", Style::default()),
             Span::styled(format_number(stats.total_sessions), bold),
             Span::styled(" sessions  ", dim),
+            Span::styled(
+                format!("{}/{}", summary.active_days, summary.total_days),
+                bold,
+            ),
+            Span::styled(" active days", dim),
+        ]),
+        Line::from(vec![
+            Span::styled("  ", Style::default()),
             Span::styled(format_number(stats.total_messages), bold),
-            Span::styled(" msgs", dim),
+            Span::styled(" msgs  ", dim),
+            Span::styled("Streak: ", dim),
+            Span::styled(format!("{}", summary.current_streak), yellow),
+            Span::styled(" days", dim),
         ]),
         Line::from(vec![
             Span::styled("  ", Style::default()),
             Span::styled(format_number(stats.total_tool_calls), bold),
             Span::styled(" tool calls  ", dim),
+            Span::styled("Best: ", dim),
+            Span::styled(format!("{}", summary.longest_streak), yellow),
+            Span::styled(" days", dim),
+        ]),
+        Line::from(vec![
+            Span::styled("  ", Style::default()),
             Span::styled(format!("{:.0}%", stats.cache_hit_rate * 100.0), bold),
-            Span::styled(" cache hit", dim),
+            Span::styled(" cache hit  ", dim),
+            Span::styled(
+                pretty_date(&summary.most_active_day),
+                Style::default().fg(Color::Cyan),
+            ),
+            Span::styled(
+                format!(" ({})", format_number(summary.most_active_day_msgs)),
+                dim,
+            ),
         ]),
     ];
 
@@ -142,29 +215,19 @@ fn render_overview(frame: &mut Frame, stats: &StatsData, area: Rect) {
         let dur = format_duration(longest.duration_ms);
         lines.push(Line::from(vec![
             Span::styled("  Longest: ", dim),
-            Span::styled(
-                format_number(longest.message_count),
-                Style::default().fg(Color::Yellow),
-            ),
-            Span::styled(format!(" msgs ({dur})"), dim),
+            Span::styled(format_number(longest.message_count), yellow),
+            Span::styled(format!(" msgs ({dur})",), dim),
         ]));
     }
 
-    let mut date_spans = vec![
-        Span::styled("  Since ", dim),
-        Span::styled(
-            stats.first_session_date.clone(),
-            Style::default().fg(Color::White),
-        ),
-    ];
-    if !stats.last_computed_date.is_empty() {
-        date_spans.push(Span::styled(" \u{00b7} ", dim));
-        date_spans.push(Span::styled(
-            stats.last_computed_date.clone(),
-            Style::default().fg(Color::DarkGray),
-        ));
-    }
-    lines.push(Line::from(date_spans));
+    let fav = shorten_model_name(&summary.favorite_model);
+    lines.push(Line::from(vec![
+        Span::styled("  Fav: ", dim),
+        Span::styled(fav, Style::default().fg(Color::Cyan)),
+        Span::styled("  Total: ", dim),
+        Span::styled(format_tokens(summary.total_tokens), bold),
+        Span::styled(" tokens", dim),
+    ]));
 
     let block = Block::default()
         .borders(Borders::ALL)
@@ -173,14 +236,11 @@ fn render_overview(frame: &mut Frame, stats: &StatsData, area: Rect) {
     frame.render_widget(Paragraph::new(lines).block(block), area);
 }
 
-fn render_models(frame: &mut Frame, stats: &StatsData, area: Rect) {
+fn render_models(frame: &mut Frame, stats: &StatsData, _summary: &stats::StatsSummary, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::DarkGray))
-        .title(Span::styled(
-            " Tokens by Model ",
-            Style::default().fg(Color::Cyan),
-        ));
+        .title(Span::styled(" Models ", Style::default().fg(Color::Cyan)));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -188,24 +248,8 @@ fn render_models(frame: &mut Frame, stats: &StatsData, area: Rect) {
         return;
     }
 
-    let max_tokens = stats
-        .model_usage
-        .iter()
-        .map(|m| m.total_tokens)
-        .max()
-        .unwrap_or(1);
-    let colors = [
-        Color::Cyan,
-        Color::Green,
-        Color::Yellow,
-        Color::Magenta,
-        Color::Blue,
-        Color::Red,
-    ];
-
-    let name_w = 14.min(inner.width as usize / 3);
-    let token_w = 7;
-    let bar_max = (inner.width as usize).saturating_sub(name_w + token_w + 4);
+    let grand_total: u64 = stats.model_usage.iter().map(|m| m.total_tokens).sum();
+    let dim = Style::default().fg(Color::DarkGray);
 
     for (i, model) in stats.model_usage.iter().enumerate() {
         if i as u16 >= inner.height {
@@ -219,25 +263,25 @@ fn render_models(frame: &mut Frame, stats: &StatsData, area: Rect) {
         };
 
         let short = shorten_model_name(&model.model);
-        let bar_len = if max_tokens > 0 {
-            ((model.total_tokens as f64 / max_tokens as f64) * bar_max as f64) as usize
+        let pct = if grand_total > 0 {
+            model.total_tokens as f64 / grand_total as f64 * 100.0
         } else {
-            0
-        }
-        .max(1);
-        let bar = "\u{2588}".repeat(bar_len);
-        let token_str = format_tokens(model.total_tokens);
-        let color = colors[i % colors.len()];
+            0.0
+        };
+        let color = MODEL_COLORS[i % MODEL_COLORS.len()];
 
         let line = Line::from(vec![
+            Span::styled(format!(" {:<14}", short), Style::default().fg(color)),
+            Span::styled(format!("{:>5.1}%", pct), Style::default().fg(Color::White)),
             Span::styled(
-                format!(" {:<width$}", short, width = name_w),
-                Style::default().fg(color),
-            ),
-            Span::styled(bar, Style::default().fg(color)),
-            Span::styled(
-                format!(" {token_str}"),
-                Style::default().fg(Color::DarkGray),
+                format!(
+                    "  {} in / {} out",
+                    format_tokens(
+                        model.input_tokens + model.cache_read_tokens + model.cache_creation_tokens
+                    ),
+                    format_tokens(model.output_tokens)
+                ),
+                dim,
             ),
         ]);
         frame.render_widget(Paragraph::new(line), row);
@@ -445,7 +489,299 @@ fn render_heatmap(frame: &mut Frame, app: &mut App, area: Rect) {
     );
 }
 
-// ── Activity by Hour ────────────────────────────────────────────────
+// ── Tokens per Day (line chart) ─────────────────────────────────────
+
+fn render_tokens_chart(frame: &mut Frame, app: &mut App, area: Rect) {
+    let stats = &app.data.stats;
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::DarkGray))
+        .title(Span::styled(
+            " Tokens per Day ",
+            Style::default().fg(Color::Cyan),
+        ));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if inner.height < 4 || inner.width < 10 {
+        return;
+    }
+
+    // Filter daily_model_tokens to the active period
+    let (start, end) = app.stats_period.date_range();
+    let filtered: Vec<&stats::DailyModelTokens> = stats
+        .daily_model_tokens
+        .iter()
+        .filter(|d| {
+            if let Some(ref s) = start {
+                if d.date.as_str() < s.as_str() {
+                    return false;
+                }
+            }
+            if let Some(ref e) = end {
+                if d.date.as_str() > e.as_str() {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect();
+
+    if filtered.is_empty() {
+        let dim = Style::default().fg(Color::DarkGray);
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled("  No token data", dim))),
+            Rect {
+                x: inner.x,
+                y: inner.y,
+                width: inner.width,
+                height: 1,
+            },
+        );
+        return;
+    }
+
+    // Compute per-day totals for each model
+    let models = &stats.all_models;
+    let n_days = filtered.len();
+
+    // Per-day total (across all models) for Y-axis scaling
+    let day_totals: Vec<u64> = filtered
+        .iter()
+        .map(|d| d.tokens_by_model.values().sum::<u64>())
+        .collect();
+    let max_total = day_totals.iter().copied().max().unwrap_or(1).max(1);
+
+    // Reserve 1 row for date labels, 1 row for legend
+    let chart_rows = inner.height.saturating_sub(2) as usize;
+    if chart_rows == 0 {
+        return;
+    }
+
+    // Y-axis label width (e.g. "691k ")
+    let y_label_w: u16 = 6;
+    let chart_x = inner.x + y_label_w;
+    let chart_w = inner.width.saturating_sub(y_label_w) as usize;
+    if chart_w < 2 {
+        return;
+    }
+
+    // Column distribution: one column per day
+    let base_col_w = chart_w / n_days;
+    let extra_cols = chart_w % n_days;
+
+    let buf = frame.buffer_mut();
+    let dim_style = Style::default().fg(Color::DarkGray);
+
+    // ── Y-axis labels (top, middle, bottom) ─────────────────────────
+    let label_positions = [0usize, chart_rows / 2, chart_rows.saturating_sub(1)];
+    for &row in &label_positions {
+        let val = max_total as f64 * (1.0 - row as f64 / (chart_rows.max(1) - 1).max(1) as f64);
+        let label = format_tokens(val as u64);
+        let y = inner.y + row as u16;
+        for (i, ch) in label.chars().enumerate() {
+            if i as u16 + inner.x < chart_x {
+                if let Some(cell) = buf.cell_mut((inner.x + i as u16, y)) {
+                    cell.set_char(ch);
+                    cell.set_style(dim_style);
+                }
+            }
+        }
+    }
+
+    // ── Build per-model series (lowest usage first → dominant draws last) ─
+    let baseline_y = inner.y + chart_rows as u16 - 1;
+
+    let mut model_series: Vec<(usize, Vec<u64>)> = models
+        .iter()
+        .enumerate()
+        .map(|(mi, model_name)| {
+            let values: Vec<u64> = filtered
+                .iter()
+                .map(|d| d.tokens_by_model.get(model_name).copied().unwrap_or(0))
+                .collect();
+            let total: u64 = values.iter().sum();
+            (mi, values, total)
+        })
+        .filter(|(_, _, total)| *total > 0)
+        .map(|(mi, values, _total)| (mi, values))
+        .collect::<Vec<_>>();
+    model_series.sort_by_key(|(mi, values)| {
+        let total: u64 = values.iter().sum();
+        (total, *mi)
+    });
+
+    // Pre-compute x positions for each day column
+    let mut col_positions: Vec<(u16, u16)> = Vec::with_capacity(n_days);
+    {
+        let mut cx = chart_x;
+        for d in 0..n_days {
+            let w = (if d < extra_cols {
+                base_col_w + 1
+            } else {
+                base_col_w
+            }) as u16;
+            col_positions.push((cx, w));
+            cx += w;
+        }
+    }
+
+    // ── Draw each model's line ──────────────────────────────────────
+    for &(mi, ref values) in &model_series {
+        let color = MODEL_COLORS[mi % MODEL_COLORS.len()];
+        let style = Style::default().fg(color);
+
+        // Map every day to a Y position — zero values go to baseline
+        let y_positions: Vec<u16> = values
+            .iter()
+            .map(|&v| {
+                if v == 0 || chart_rows <= 1 {
+                    baseline_y
+                } else {
+                    let frac = v as f64 / max_total as f64;
+                    let row = ((1.0 - frac) * (chart_rows as f64 - 1.0)).round() as u16;
+                    inner.y + row
+                }
+            })
+            .collect();
+
+        // Draw connecting lines between ALL consecutive days
+        for d in 0..n_days.saturating_sub(1) {
+            let y = y_positions[d];
+            let y_next = y_positions[d + 1];
+            let (cx, cw) = col_positions[d];
+            let (cx_next, cw_next) = col_positions[d + 1];
+            let mid_x = cx + cw / 2;
+            let mid_x_next = cx_next + cw_next / 2;
+
+            if y == y_next {
+                // Same row — horizontal line
+                for x in (mid_x + 1)..mid_x_next {
+                    if let Some(cell) = buf.cell_mut((x, y)) {
+                        cell.set_char('\u{2500}'); // ─
+                        cell.set_style(style);
+                    }
+                }
+            } else {
+                // Different rows — stepped connection with smooth corners
+                let step_x = (mid_x + mid_x_next) / 2;
+                // Horizontal from current toward step
+                for x in (mid_x + 1)..step_x {
+                    if let Some(cell) = buf.cell_mut((x, y)) {
+                        cell.set_char('\u{2500}'); // ─
+                        cell.set_style(style);
+                    }
+                }
+                // Corners + vertical
+                let (y_min, y_max) = if y < y_next { (y, y_next) } else { (y_next, y) };
+                for vy in (y_min + 1)..y_max {
+                    if let Some(cell) = buf.cell_mut((step_x, vy)) {
+                        cell.set_char('\u{2502}'); // │
+                        cell.set_style(style);
+                    }
+                }
+                if y < y_next {
+                    // Going down: ╮ at top, ╰ at bottom
+                    if let Some(cell) = buf.cell_mut((step_x, y)) {
+                        cell.set_char('\u{256E}'); // ╮
+                        cell.set_style(style);
+                    }
+                    if let Some(cell) = buf.cell_mut((step_x, y_next)) {
+                        cell.set_char('\u{2570}'); // ╰
+                        cell.set_style(style);
+                    }
+                } else {
+                    // Going up: ╯ at bottom, ╭ at top
+                    if let Some(cell) = buf.cell_mut((step_x, y)) {
+                        cell.set_char('\u{256F}'); // ╯
+                        cell.set_style(style);
+                    }
+                    if let Some(cell) = buf.cell_mut((step_x, y_next)) {
+                        cell.set_char('\u{256D}'); // ╭
+                        cell.set_style(style);
+                    }
+                }
+                // Horizontal from step toward next
+                for x in (step_x + 1)..mid_x_next {
+                    if let Some(cell) = buf.cell_mut((x, y_next)) {
+                        cell.set_char('\u{2500}'); // ─
+                        cell.set_style(style);
+                    }
+                }
+            }
+        }
+
+        // Draw bold markers only for non-zero days (on top of lines)
+        for d in 0..n_days {
+            if values[d] == 0 {
+                continue;
+            }
+            let y = y_positions[d];
+            let (cx, cw) = col_positions[d];
+            let mid_x = cx + cw / 2;
+            if let Some(cell) = buf.cell_mut((mid_x, y)) {
+                cell.set_char('\u{25CF}'); // ● filled circle
+                cell.set_style(style);
+            }
+        }
+    }
+
+    // ── Date labels along bottom ────────────────────────────────────
+    let label_y = inner.y + chart_rows as u16;
+    if label_y < inner.y + inner.height {
+        // Show ~5 evenly spaced date labels
+        let n_labels = 5.min(n_days);
+        if n_labels > 0 {
+            let step = if n_labels > 1 {
+                (n_days - 1) / (n_labels - 1)
+            } else {
+                1
+            };
+            for li in 0..n_labels {
+                let d = (li * step).min(n_days - 1);
+                let date_str = &filtered[d].date;
+                let short = if let Some((_, m, day)) = stats::parse_date(date_str) {
+                    format!("{} {day}", MONTH_ABBR[m as usize - 1])
+                } else {
+                    continue;
+                };
+                let (cx, _) = col_positions[d];
+                for (i, ch) in short.chars().enumerate() {
+                    let x = cx + i as u16;
+                    if x < inner.x + inner.width {
+                        if let Some(cell) = buf.cell_mut((x, label_y)) {
+                            cell.set_char(ch);
+                            cell.set_style(dim_style);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Legend ───────────────────────────────────────────────────────
+    let legend_y = inner.y + chart_rows as u16 + 1;
+    if legend_y < inner.y + inner.height {
+        let mut spans: Vec<Span> = vec![Span::styled("  ", Style::default())];
+        for &(mi, _) in model_series.iter().rev() {
+            let color = MODEL_COLORS[mi % MODEL_COLORS.len()];
+            let name = shorten_model_name(&models[mi]);
+            spans.push(Span::styled("\u{25CF} ", Style::default().fg(color)));
+            spans.push(Span::styled(format!("{name}  "), dim_style));
+        }
+        frame.render_widget(
+            Paragraph::new(Line::from(spans)),
+            Rect {
+                x: inner.x,
+                y: legend_y,
+                width: inner.width,
+                height: 1,
+            },
+        );
+    }
+}
+
+// ── Activity by Hour (fallback when no dailyModelTokens) ────────────
 
 const EIGHTH_BLOCKS: [char; 9] = [
     ' ', '\u{2581}', '\u{2582}', '\u{2583}', '\u{2584}', '\u{2585}', '\u{2586}', '\u{2587}',
@@ -569,7 +905,10 @@ fn format_duration(ms: u64) -> String {
     let secs = ms / 1000;
     let mins = secs / 60;
     let hours = mins / 60;
-    if hours > 0 {
+    let days = hours / 24;
+    if days > 0 {
+        format!("{}d {}h {}m", days, hours % 24, mins % 60)
+    } else if hours > 0 {
         format!("{}h {}m", hours, mins % 60)
     } else {
         format!("{}m", mins)

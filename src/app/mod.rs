@@ -527,6 +527,7 @@ pub struct App {
     pub stats_heatmap_cols: u16,
     pub stats_heatmap_base_w: u16,
     pub stats_heatmap_extra: u16, // first `extra` cols are base_w+1
+    pub stats_period: lazyclaude::sources::stats::StatsPeriod,
 
     // Undo stack for destructive operations (capped at 20)
     pub undo_stack: Vec<UndoAction>,
@@ -579,6 +580,7 @@ impl App {
             stats_heatmap_cols: 0,
             stats_heatmap_base_w: 1,
             stats_heatmap_extra: 0,
+            stats_period: Default::default(),
             pending_edit: None,
             item_paths: Vec::new(),
             item_bodies: Vec::new(),

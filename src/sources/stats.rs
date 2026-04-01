@@ -15,6 +15,8 @@ pub struct StatsData {
     pub model_usage: Vec<ModelUsageEntry>,
     pub longest_session: Option<LongestSession>,
     pub hour_counts: [u64; 24],
+    pub daily_model_tokens: Vec<DailyModelTokens>,
+    pub all_models: Vec<String>, // deduplicated, sorted by total usage desc
 }
 
 #[derive(Default, Clone, serde::Serialize)]
@@ -40,6 +42,32 @@ pub struct LongestSession {
     pub session_id: String,
     pub duration_ms: u64,
     pub message_count: u64,
+}
+
+#[derive(Default, Clone, serde::Serialize)]
+pub struct DailyModelTokens {
+    pub date: String,
+    pub tokens_by_model: HashMap<String, u64>,
+}
+
+#[derive(Default, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub enum StatsPeriod {
+    #[default]
+    AllTime,
+    Last7Days,
+    Last30Days,
+}
+
+#[derive(Default, Clone, serde::Serialize)]
+pub struct StatsSummary {
+    pub active_days: usize,
+    pub total_days: usize,
+    pub current_streak: usize,
+    pub longest_streak: usize,
+    pub most_active_day: String,
+    pub most_active_day_msgs: u64,
+    pub favorite_model: String,
+    pub total_tokens: u64,
 }
 
 pub fn load(paths: &Paths) -> StatsData {
@@ -137,6 +165,32 @@ pub fn load(paths: &Paths) -> StatsData {
         }
     }
 
+    let daily_model_tokens: Vec<DailyModelTokens> = json["dailyModelTokens"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .map(|v| {
+                    let date = v["date"].as_str().unwrap_or("").to_string();
+                    let tokens_by_model = v["tokensByModel"]
+                        .as_object()
+                        .map(|obj| {
+                            obj.iter()
+                                .map(|(k, v)| (k.clone(), v.as_u64().unwrap_or(0)))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    DailyModelTokens {
+                        date,
+                        tokens_by_model,
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    // Deduplicated model names sorted by total usage desc (matches model_usage order)
+    let all_models: Vec<String> = model_usage.iter().map(|m| m.model.clone()).collect();
+
     StatsData {
         total_sessions,
         total_messages,
@@ -149,6 +203,8 @@ pub fn load(paths: &Paths) -> StatsData {
         model_usage,
         longest_session,
         hour_counts,
+        daily_model_tokens,
+        all_models,
     }
 }
 
@@ -279,4 +335,214 @@ pub fn year_heatmap_dates() -> (Vec<String>, String, usize) {
 
     let n_weeks = dates.len().div_ceil(7);
     (dates, today_str, n_weeks)
+}
+
+// ── Epoch conversion ────────────────────────────────────────────────────
+
+/// Convert a civil date to days since 1970-01-01 (inverse of `civil_from_days`).
+pub fn days_since_epoch(y: i32, m: u32, d: u32) -> i64 {
+    let y = y as i64;
+    let (y, m) = if m <= 2 { (y - 1, m + 9) } else { (y, m - 3) };
+    let era = y.div_euclid(400);
+    let yoe = (y - era * 400) as u32;
+    let doy = (153 * m + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146097 + doe as i64 - 719468
+}
+
+// ── Period helpers ──────────────────────────────────────────────────────
+
+impl StatsPeriod {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::AllTime => "All time",
+            Self::Last7Days => "Last 7 days",
+            Self::Last30Days => "Last 30 days",
+        }
+    }
+
+    pub fn next(self) -> Self {
+        match self {
+            Self::AllTime => Self::Last7Days,
+            Self::Last7Days => Self::Last30Days,
+            Self::Last30Days => Self::AllTime,
+        }
+    }
+
+    pub fn prev(self) -> Self {
+        match self {
+            Self::AllTime => Self::Last30Days,
+            Self::Last30Days => Self::Last7Days,
+            Self::Last7Days => Self::AllTime,
+        }
+    }
+
+    /// Returns `(start_date, end_date)` as "YYYY-MM-DD" strings.
+    /// `AllTime` returns `(None, None)`.
+    pub fn date_range(self) -> (Option<String>, Option<String>) {
+        match self {
+            Self::AllTime => (None, None),
+            Self::Last7Days => {
+                let (y, m, d) = today();
+                let end = format_date(y, m, d);
+                let (sy, sm, sd) = add_days(y, m, d, -6);
+                (Some(format_date(sy, sm, sd)), Some(end))
+            }
+            Self::Last30Days => {
+                let (y, m, d) = today();
+                let end = format_date(y, m, d);
+                let (sy, sm, sd) = add_days(y, m, d, -29);
+                (Some(format_date(sy, sm, sd)), Some(end))
+            }
+        }
+    }
+}
+
+// ── Summary computation ─────────────────────────────────────────────────
+
+pub fn compute_summary(stats: &StatsData, start: Option<&str>, end: Option<&str>) -> StatsSummary {
+    // Filter daily_activity to the date range
+    let filtered: Vec<&DailyActivity> = stats
+        .daily_activity
+        .iter()
+        .filter(|d| {
+            if let Some(s) = start {
+                if d.date.as_str() < s {
+                    return false;
+                }
+            }
+            if let Some(e) = end {
+                if d.date.as_str() > e {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect();
+
+    let active_days = filtered.iter().filter(|d| d.messages > 0).count();
+
+    // Total days span
+    let total_days = if filtered.is_empty() {
+        0
+    } else {
+        let first = filtered.first().unwrap().date.as_str();
+        let last_date = end.unwrap_or_else(|| {
+            let (y, m, d) = today();
+            // leak a tiny string — this runs at most once per render
+            Box::leak(format_date(y, m, d).into_boxed_str())
+        });
+        if let (Some(f), Some(l)) = (parse_date(first), parse_date(last_date)) {
+            (days_since_epoch(l.0, l.1, l.2) - days_since_epoch(f.0, f.1, f.2) + 1).max(0) as usize
+        } else {
+            0
+        }
+    };
+
+    // Most active day
+    let (most_active_day, most_active_day_msgs) = filtered
+        .iter()
+        .max_by_key(|d| d.messages)
+        .map(|d| (d.date.clone(), d.messages))
+        .unwrap_or_default();
+
+    // Streaks — need a set of active dates for O(1) lookup
+    let active_set: std::collections::HashSet<&str> = filtered
+        .iter()
+        .filter(|d| d.messages > 0)
+        .map(|d| d.date.as_str())
+        .collect();
+
+    // Current streak: walk backwards from today
+    let (ty, tm, td) = today();
+    let today_str = format_date(ty, tm, td);
+    let mut current_streak = 0usize;
+    {
+        let (mut cy, mut cm, mut cd) = (ty, tm, td);
+        // If today has no activity yet, start from yesterday
+        if !active_set.contains(today_str.as_str()) {
+            let (ny, nm, nd) = add_days(cy, cm, cd, -1);
+            cy = ny;
+            cm = nm;
+            cd = nd;
+        }
+        loop {
+            let ds = format_date(cy, cm, cd);
+            if !active_set.contains(ds.as_str()) {
+                break;
+            }
+            current_streak += 1;
+            let (ny, nm, nd) = add_days(cy, cm, cd, -1);
+            cy = ny;
+            cm = nm;
+            cd = nd;
+        }
+    }
+
+    // Longest streak: scan all active dates forward
+    let mut longest_streak = 0usize;
+    {
+        let mut sorted_dates: Vec<i64> = active_set
+            .iter()
+            .filter_map(|s| parse_date(s).map(|(y, m, d)| days_since_epoch(y, m, d)))
+            .collect();
+        sorted_dates.sort_unstable();
+        let mut run = 0usize;
+        for i in 0..sorted_dates.len() {
+            if i == 0 || sorted_dates[i] == sorted_dates[i - 1] + 1 {
+                run += 1;
+            } else {
+                run = 1;
+            }
+            longest_streak = longest_streak.max(run);
+        }
+    }
+
+    // Favorite model + total tokens
+    let (favorite_model, total_tokens) = if start.is_none() {
+        // AllTime — use pre-aggregated model_usage
+        let fav = stats
+            .model_usage
+            .first()
+            .map(|m| m.model.clone())
+            .unwrap_or_default();
+        let total: u64 = stats.model_usage.iter().map(|m| m.total_tokens).sum();
+        (fav, total)
+    } else {
+        // Filtered period — re-aggregate from daily_model_tokens
+        let mut totals: HashMap<String, u64> = HashMap::new();
+        for dmt in &stats.daily_model_tokens {
+            if let Some(s) = start {
+                if dmt.date.as_str() < s {
+                    continue;
+                }
+            }
+            if let Some(e) = end {
+                if dmt.date.as_str() > e {
+                    continue;
+                }
+            }
+            for (model, &tokens) in &dmt.tokens_by_model {
+                *totals.entry(model.clone()).or_default() += tokens;
+            }
+        }
+        let total: u64 = totals.values().sum();
+        let fav = totals
+            .iter()
+            .max_by_key(|(_, &v)| v)
+            .map(|(k, _)| k.clone())
+            .unwrap_or_default();
+        (fav, total)
+    };
+
+    StatsSummary {
+        active_days,
+        total_days,
+        current_streak,
+        longest_streak,
+        most_active_day,
+        most_active_day_msgs,
+        favorite_model,
+        total_tokens,
+    }
 }

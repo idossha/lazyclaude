@@ -298,7 +298,7 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         Panel::Config => "e=Edit y=Copy",
         Panel::Projects => "Enter=Select",
         Panel::Sessions => "x=Export y=Copy",
-        Panel::Stats => "",
+        Panel::Stats => "[/]=Period",
         Panel::Todos => "",
     };
 

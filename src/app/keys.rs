@@ -34,6 +34,14 @@ impl App {
             }
             KeyCode::Char('R') => self.refresh(),
 
+            // Stats period cycling
+            KeyCode::Char('[') if self.active_panel == Panel::Stats => {
+                self.stats_period = self.stats_period.prev();
+            }
+            KeyCode::Char(']') if self.active_panel == Panel::Stats => {
+                self.stats_period = self.stats_period.next();
+            }
+
             // Direct panel selection with number keys
             KeyCode::Char(c @ '1'..='9') => {
                 let idx = (c as usize) - ('1' as usize);
