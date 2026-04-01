@@ -9,31 +9,7 @@ impl App {
             _ => return,
         };
 
-        // Plugins are local filesystem — no network, run synchronously
-        if source == SearchSource::Plugins {
-            self.set_message("Loading plugins...".to_string());
-            match self.fetch_plugins_for_overlay() {
-                Ok(items) => {
-                    let count = items.len();
-                    self.search_overlay = Some(SearchOverlay {
-                        source,
-                        all_items: items,
-                        filter: String::new(),
-                        filter_cursor: 0,
-                        selected: 0,
-                        preview_scroll: 0,
-                        preview_focused: false,
-                    });
-                    self.set_message(format!("Found {} items", count));
-                }
-                Err(e) => {
-                    self.set_message(format!("Search failed: {e}"));
-                }
-            }
-            return;
-        }
-
-        // Skills and MCP require network — fetch in background thread
+        // All sources use background thread for network fetch
         self.set_message(format!("Loading {}...", source.label()));
 
         let (tx, rx) = mpsc::channel();
@@ -53,7 +29,7 @@ impl App {
                 std::thread::spawn(move || {
                     let entries = match cache {
                         Some(cached) => Ok(cached),
-                        None => sources::skills_registry::fetch_skills(),
+                        None => sources::skills_registry::fetch_all_skills(),
                     };
                     let result = entries.map(|entries| {
                         entries
@@ -62,10 +38,11 @@ impl App {
                                 let installed = installed_names.contains(&e.name)
                                     || installed_dirs.contains(&e.dir_name);
                                 let preview = e.preview_body(installed);
+                                let extra = e.source.clone();
                                 SearchOverlayItem {
                                     name: e.name.clone(),
                                     description: e.description.clone(),
-                                    extra: "anthropics/skills".to_string(),
+                                    extra,
                                     installed,
                                     preview,
                                     data: SearchItemData::Skill(e),
@@ -91,16 +68,27 @@ impl App {
                     .collect();
 
                 std::thread::spawn(move || {
-                    let result = sources::mcp_registry::search_npm("").map(|entries| {
+                    let result = sources::mcp_registry::search_all("").map(|entries| {
                         entries
                             .into_iter()
                             .map(|e| {
                                 let installed = installed_names.iter().any(|n| n.contains(&e.name));
+                                let version_info = if e.version.is_empty() {
+                                    String::new()
+                                } else {
+                                    format!("v{} ", e.version)
+                                };
+                                let extra = format!(
+                                    "{}{} {}",
+                                    version_info,
+                                    e.registry,
+                                    e.popularity_dots()
+                                );
                                 let preview = e.preview_body();
                                 SearchOverlayItem {
                                     name: e.name.clone(),
                                     description: e.description.clone(),
-                                    extra: format!("v{} {}", e.version, e.popularity_dots()),
+                                    extra,
                                     installed,
                                     preview,
                                     data: SearchItemData::Mcp(e),
@@ -111,7 +99,45 @@ impl App {
                     let _ = tx.send(result);
                 });
             }
-            SearchSource::Plugins => unreachable!(),
+            SearchSource::Plugins => {
+                let plugins_dir = self.paths.claude_dir.join("plugins");
+                let installed_names: Vec<String> = self
+                    .data
+                    .plugins
+                    .installed
+                    .iter()
+                    .map(|p| p.name.clone())
+                    .collect();
+
+                std::thread::spawn(move || {
+                    let result =
+                        sources::plugin_registry::search_all(&plugins_dir, "").map(|entries| {
+                            entries
+                                .into_iter()
+                                .map(|e| {
+                                    let installed = installed_names.contains(&e.name);
+                                    let extra = if !e.category.is_empty() {
+                                        format!("{} ({})", e.marketplace, e.category)
+                                    } else if !e.component_summary().is_empty() {
+                                        format!("{} {}", e.marketplace, e.component_summary())
+                                    } else {
+                                        e.marketplace.clone()
+                                    };
+                                    let preview = e.preview_body();
+                                    SearchOverlayItem {
+                                        name: e.name.clone(),
+                                        description: e.description.clone(),
+                                        extra,
+                                        installed,
+                                        preview,
+                                        data: SearchItemData::Plugin(e),
+                                    }
+                                })
+                                .collect()
+                        });
+                    let _ = tx.send(result);
+                });
+            }
         }
 
         self.search_receiver = Some(rx);
@@ -227,34 +253,5 @@ impl App {
                 }));
             }
         }
-    }
-
-    fn fetch_plugins_for_overlay(&self) -> Result<Vec<SearchOverlayItem>, String> {
-        let plugins_dir = self.paths.claude_dir.join("plugins");
-        let entries = sources::plugin_registry::search_local(&plugins_dir, "")?;
-
-        let installed_names: Vec<String> = self
-            .data
-            .plugins
-            .installed
-            .iter()
-            .map(|p| p.name.clone())
-            .collect();
-
-        Ok(entries
-            .into_iter()
-            .map(|e| {
-                let installed = installed_names.contains(&e.name);
-                let preview = e.preview_body();
-                SearchOverlayItem {
-                    name: e.name.clone(),
-                    description: e.description.clone(),
-                    extra: e.component_summary(),
-                    installed,
-                    preview,
-                    data: SearchItemData::Plugin(e),
-                }
-            })
-            .collect())
     }
 }

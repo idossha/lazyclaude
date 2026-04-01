@@ -141,9 +141,9 @@ fn panel_description(panel: Panel) -> Vec<&'static str> {
         ],
         Panel::Plugins => vec![
             "  Plugins extend Claude Code with third-party tools and",
-            "  capabilities from plugin marketplaces. You can install,",
-            "  block, and manage plugins that add new functionality",
-            "  to your Claude Code environment.",
+            "  capabilities. Search discovers plugins from local",
+            "  marketplaces and the official Anthropic directory",
+            "  (123+ plugins). Install, block, and manage plugins.",
         ],
         Panel::Todos => vec![
             "  Todo items tracked by Claude Code during sessions.",
@@ -158,7 +158,7 @@ fn panel_locations(panel: Panel) -> Vec<(&'static str, &'static str)> {
     match panel {
         Panel::Projects => vec![("Discovery", "~/.claude/projects/<encoded-path>/")],
         Panel::Config => vec![
-            ("User", "~/CLAUDE.md"),
+            ("User", "~/.claude/CLAUDE.md"),
             ("Project", "<project>/CLAUDE.md  or  .claude/CLAUDE.md"),
             ("User rules", "~/.claude/rules/*.md"),
             ("Project rules", "<project>/.claude/rules/*.md"),
@@ -214,8 +214,8 @@ fn panel_management(panel: Panel) -> Vec<&'static str> {
             "  A skill is a directory containing SKILL.md with YAML",
             "  frontmatter (name, description, user_invocable). When",
             "  user_invocable is true, the skill appears as a slash",
-            "  command (e.g., /my-skill). Search the registry to",
-            "  discover and install community skills.",
+            "  command. Search discovers skills from anthropics/skills",
+            "  and ComposioHQ/awesome-claude-skills.",
         ],
         Panel::Agents => vec![
             "  Each agent directory contains AGENT.md with frontmatter",
@@ -228,7 +228,8 @@ fn panel_management(panel: Panel) -> Vec<&'static str> {
             "  to run), args (arguments), env (environment variables),",
             "  and disabled (toggle on/off). Claude discovers tools",
             "  from running servers at conversation start. Search the",
-            "  npm registry to discover and install MCP servers.",
+            "  npm, official MCP, and Smithery registries to discover",
+            "  and install MCP servers.",
         ],
         Panel::Settings => vec![
             "  Permissions control which tools and shell commands",
@@ -292,7 +293,7 @@ fn panel_keys(panel: Panel) -> Vec<(&'static str, &'static str)> {
             ("x", "Export panel as JSON"),
         ],
         Panel::Mcp => vec![
-            ("s", "Search npm registry"),
+            ("s", "Search MCP registries"),
             ("a", "Add MCP server"),
             ("t", "Toggle enable/disable"),
             ("d", "Delete server"),
@@ -302,7 +303,7 @@ fn panel_keys(panel: Panel) -> Vec<(&'static str, &'static str)> {
         ],
         Panel::Settings => vec![
             ("a", "Add allow permission"),
-            ("D", "Add deny permission"),
+            ("D", "Deny selected permission"),
             ("d", "Delete permission/entry"),
             ("u", "Undo last delete"),
             ("y", "Copy to clipboard"),
@@ -349,7 +350,8 @@ fn panel_references(panel: Panel) -> Vec<(&'static str, &'static str)> {
         Panel::Memory => vec![("Memory", "docs.anthropic.com/en/docs/claude-code/memory")],
         Panel::Skills => vec![
             ("Skills", "docs.anthropic.com/en/docs/claude-code/skills"),
-            ("Registry", "github.com/anthropics/skills"),
+            ("Official", "github.com/anthropics/skills"),
+            ("Community", "github.com/ComposioHQ/awesome-claude-skills"),
         ],
         Panel::Agents => vec![(
             "Sub-agents",

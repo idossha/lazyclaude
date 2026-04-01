@@ -11,6 +11,7 @@ pub struct TodoItem {
 pub fn load(paths: &Paths) -> Vec<TodoItem> {
     let dir = paths.claude_dir.join("todos");
     let mut items = Vec::new();
+    let mut next_id: u32 = 0;
 
     let entries = match std::fs::read_dir(&dir) {
         Ok(e) => e,
@@ -68,9 +69,10 @@ pub fn load(paths: &Paths) -> Vec<TodoItem> {
                     .to_string();
 
                 if !id.is_empty() || !text.is_empty() {
+                    next_id += 1;
                     items.push(TodoItem {
                         id: if id.is_empty() {
-                            format!("{}", items.len())
+                            format!("auto-{next_id}")
                         } else {
                             id
                         },

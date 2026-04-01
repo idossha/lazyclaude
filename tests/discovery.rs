@@ -1715,6 +1715,8 @@ fn test_plugin_registry_component_tags() {
         has_hooks: true,
         has_commands: false,
         has_mcp: true,
+        category: String::new(),
+        homepage: String::new(),
     };
 
     let tags = entry.component_tags();
@@ -1735,6 +1737,8 @@ fn test_plugin_registry_component_summary() {
         has_hooks: false,
         has_commands: false,
         has_mcp: false,
+        category: String::new(),
+        homepage: String::new(),
     };
 
     assert_eq!(entry.component_summary(), "agents skills");
@@ -1754,6 +1758,8 @@ fn test_plugin_registry_component_summary_empty() {
         has_hooks: false,
         has_commands: false,
         has_mcp: false,
+        category: String::new(),
+        homepage: String::new(),
     };
 
     assert_eq!(entry.component_summary(), "");
@@ -1774,6 +1780,8 @@ fn test_plugin_registry_preview_body() {
         has_hooks: false,
         has_commands: false,
         has_mcp: false,
+        category: "development".to_string(),
+        homepage: String::new(),
     };
 
     let body = entry.preview_body();
@@ -2053,9 +2061,9 @@ fn test_todos_auto_id_when_missing() {
 
     let todos = sources::todos::load(&paths);
     assert_eq!(todos.len(), 2);
-    // Auto-generated IDs should be numeric strings based on position
-    assert_eq!(todos[0].id, "0");
-    assert_eq!(todos[1].id, "1");
+    // Auto-generated IDs use monotonic counter with "auto-" prefix
+    assert_eq!(todos[0].id, "auto-1");
+    assert_eq!(todos[1].id, "auto-2");
 }
 
 #[test]
@@ -2262,6 +2270,8 @@ fn test_skills_registry_preview_body_not_installed() {
         name: "code-review".to_string(),
         description: "Automated code review\nwith AI feedback".to_string(),
         dir_name: "code-review".to_string(),
+        source: "anthropics/skills".to_string(),
+        raw_base_url: "https://raw.githubusercontent.com/anthropics/skills/main/skills".to_string(),
     };
 
     let body = entry.preview_body(false);
@@ -2269,7 +2279,7 @@ fn test_skills_registry_preview_body_not_installed() {
     assert!(body.contains("Automated code review"));
     assert!(body.contains("with AI feedback"));
     assert!(body.contains("Source: github.com/anthropics/skills"));
-    assert!(body.contains("Directory: skills/code-review"));
+    assert!(body.contains("Directory: code-review"));
     assert!(body.contains("## Install"));
     assert!(body.contains("~/.claude/skills/code-review/"));
     assert!(!body.contains("Already installed"));
@@ -2281,6 +2291,8 @@ fn test_skills_registry_preview_body_installed() {
         name: "my-skill".to_string(),
         description: "A skill".to_string(),
         dir_name: "my-skill".to_string(),
+        source: "anthropics/skills".to_string(),
+        raw_base_url: String::new(),
     };
 
     let body = entry.preview_body(true);
@@ -2293,6 +2305,8 @@ fn test_skills_registry_preview_body_empty_description() {
         name: "no-desc".to_string(),
         description: String::new(),
         dir_name: "no-desc".to_string(),
+        source: "anthropics/skills".to_string(),
+        raw_base_url: String::new(),
     };
 
     let body = entry.preview_body(false);
@@ -2582,6 +2596,8 @@ fn test_plugin_registry_preview_truncates_long_readme() {
         has_hooks: false,
         has_commands: false,
         has_mcp: false,
+        category: String::new(),
+        homepage: String::new(),
     };
 
     let body = entry.preview_body();
@@ -2605,6 +2621,8 @@ fn test_plugin_registry_preview_short_readme_no_truncation() {
         has_hooks: false,
         has_commands: false,
         has_mcp: false,
+        category: String::new(),
+        homepage: String::new(),
     };
 
     let body = entry.preview_body();

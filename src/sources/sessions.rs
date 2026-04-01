@@ -17,7 +17,16 @@ pub fn load_sessions(project_dir: &Path) -> Vec<Session> {
 
     let entries = match fs::read_dir(project_dir) {
         Ok(e) => e,
-        Err(_) => return sessions,
+        Err(e) => {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                tracing::warn!(
+                    "Failed to read sessions dir {}: {}",
+                    project_dir.display(),
+                    e
+                );
+            }
+            return sessions;
+        }
     };
 
     for entry in entries.flatten() {

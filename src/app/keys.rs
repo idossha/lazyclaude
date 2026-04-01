@@ -154,16 +154,23 @@ impl App {
             // Delete action
             KeyCode::Char('d') => self.action_delete(),
 
-            // Add deny permission
+            // Deny selected permission
             KeyCode::Char('D') if self.active_panel == Panel::Settings => {
-                self.input_mode = InputMode::Input(InputState {
-                    prompt: "Deny permission".to_string(),
-                    value: String::new(),
-                    cursor: 0,
-                    purpose: InputPurpose::AddPermission {
-                        kind: "deny".to_string(),
-                    },
-                });
+                if let Some((kind, scope, index, rule)) = self.resolve_permission() {
+                    if kind == "deny" {
+                        self.set_message("Already in deny list".to_string());
+                    } else {
+                        self.input_mode = InputMode::Confirm(Box::new(ConfirmState {
+                            message: format!("Deny permission '{rule}'?"),
+                            purpose: ConfirmPurpose::DenyPermission {
+                                scope,
+                                kind,
+                                index,
+                                rule,
+                            },
+                        }));
+                    }
+                }
             }
 
             // Search overlay (Skills, MCP, Plugins)

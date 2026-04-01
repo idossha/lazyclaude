@@ -1,11 +1,13 @@
-//! Plugin discovery from local marketplace directories.
+//! Plugin discovery from local marketplace directories and the official
+//! Anthropic plugin marketplace.
 //!
-//! Scans the cached marketplace repos under `~/.claude/plugins/marketplaces/`
-//! for available plugins, reading their `plugin.json` metadata and optional README.
+//! Sources:
+//! - Local: `~/.claude/plugins/marketplaces/` (cached git repos)
+//! - Remote: `anthropics/claude-plugins-official` marketplace.json on GitHub
 
 use std::path::Path;
 
-/// A discovered plugin from a local marketplace.
+/// A discovered plugin from a marketplace.
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct PluginEntry {
     pub name: String,
@@ -19,6 +21,8 @@ pub struct PluginEntry {
     pub has_hooks: bool,
     pub has_commands: bool,
     pub has_mcp: bool,
+    pub category: String,
+    pub homepage: String,
 }
 
 impl PluginEntry {
@@ -43,6 +47,9 @@ impl PluginEntry {
         if !self.author.is_empty() {
             lines.push(format!("Author: {}", self.author));
         }
+        if !self.category.is_empty() {
+            lines.push(format!("Category: {}", self.category));
+        }
         lines.push(format!("Marketplace: {}", self.marketplace));
 
         lines.push(String::new());
@@ -54,6 +61,14 @@ impl PluginEntry {
             for tag in &components {
                 lines.push(format!("- {tag}"));
             }
+            lines.push(String::new());
+        }
+
+        // Homepage
+        if !self.homepage.is_empty() {
+            lines.push("---".to_string());
+            lines.push(String::new());
+            lines.push(format!("Homepage: {}", self.homepage));
             lines.push(String::new());
         }
 
@@ -216,6 +231,8 @@ pub fn search_local(plugins_dir: &Path, query: &str) -> Result<Vec<PluginEntry>,
                 has_hooks,
                 has_commands,
                 has_mcp,
+                category: String::new(),
+                homepage: String::new(),
             });
         }
     }
@@ -224,4 +241,105 @@ pub fn search_local(plugins_dir: &Path, query: &str) -> Result<Vec<PluginEntry>,
     results.sort_by(|a, b| a.name.cmp(&b.name));
 
     Ok(results)
+}
+
+// ── Official marketplace (anthropics/claude-plugins-official) ───────────
+
+/// Fetch plugins from the official Anthropic marketplace via marketplace.json.
+/// Returns all 100+ plugins in a single API call.
+pub fn fetch_official_marketplace() -> Result<Vec<PluginEntry>, String> {
+    tracing::info!("Fetching official plugin marketplace");
+
+    let url = "https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/.claude-plugin/marketplace.json";
+
+    let response = ureq::get(url)
+        .set("User-Agent", "lazyclaude")
+        .call()
+        .map_err(|e| format!("Marketplace fetch failed: {e}"))?;
+
+    let entries: Vec<serde_json::Value> = response
+        .into_json()
+        .map_err(|e| format!("Marketplace JSON parse error: {e}"))?;
+
+    let mut results = Vec::new();
+
+    for entry in &entries {
+        let name = match entry["name"].as_str() {
+            Some(n) if !n.is_empty() => n.to_string(),
+            _ => continue,
+        };
+        let description = entry["description"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        let category = entry["category"].as_str().unwrap_or_default().to_string();
+        let version = entry["version"].as_str().unwrap_or_default().to_string();
+        let homepage = entry["homepage"].as_str().unwrap_or_default().to_string();
+        let author = entry["author"]["name"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+
+        // Detect components from metadata hints
+        let has_skills = entry.get("skills").is_some();
+        let has_mcp = entry.get("lspServers").is_some();
+
+        results.push(PluginEntry {
+            name,
+            description,
+            version,
+            author,
+            marketplace: "claude-plugins-official".to_string(),
+            readme: String::new(),
+            has_agents: false,
+            has_skills,
+            has_hooks: false,
+            has_commands: false,
+            has_mcp,
+            category,
+            homepage,
+        });
+    }
+
+    results.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(results)
+}
+
+/// Search all plugin sources: local marketplaces + official marketplace.
+/// Local results first, then official (deduplicated by name).
+pub fn search_all(plugins_dir: &Path, query: &str) -> Result<Vec<PluginEntry>, String> {
+    // Local search is fast (filesystem)
+    let mut all = search_local(plugins_dir, query).unwrap_or_default();
+
+    // Official marketplace (network)
+    match fetch_official_marketplace() {
+        Ok(entries) => {
+            tracing::info!("Official marketplace: {} plugins", entries.len());
+            let query_lower = query.to_lowercase();
+            let filtered: Vec<PluginEntry> = if query_lower.is_empty() {
+                entries
+            } else {
+                entries
+                    .into_iter()
+                    .filter(|e| {
+                        e.name.to_lowercase().contains(&query_lower)
+                            || e.description.to_lowercase().contains(&query_lower)
+                            || e.category.to_lowercase().contains(&query_lower)
+                    })
+                    .collect()
+            };
+            all.extend(filtered);
+        }
+        Err(e) => {
+            tracing::warn!("Official marketplace failed: {}", e);
+            // Continue with local results only
+        }
+    }
+
+    // Deduplicate by name (local takes precedence)
+    let mut seen = std::collections::HashSet::new();
+    all.retain(|entry| seen.insert(entry.name.clone()));
+
+    all.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(all)
 }

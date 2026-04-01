@@ -32,23 +32,28 @@ fn scan_dir(agents: &mut Vec<Agent>, dir: &std::path::Path, scope: Scope) {
             continue;
         }
         if path.extension().map(|e| e == "md").unwrap_or(false) {
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                let file_stem = path
-                    .file_stem()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string();
-                let (fm, body) = parse_frontmatter(&content);
-                agents.push(Agent {
-                    path,
-                    name: fm.get("name").cloned().unwrap_or_else(|| file_stem.clone()),
-                    description: fm.get("description").cloned().unwrap_or_default(),
-                    model: fm.get("model").cloned().unwrap_or_default(),
-                    body,
-                    dir_name: file_stem,
-                    scope,
-                });
-            }
+            let content = match std::fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(e) => {
+                    tracing::warn!("Failed to read agent file {}: {}", path.display(), e);
+                    continue;
+                }
+            };
+            let file_stem = path
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            let (fm, body) = parse_frontmatter(&content);
+            agents.push(Agent {
+                path,
+                name: fm.get("name").cloned().unwrap_or_else(|| file_stem.clone()),
+                description: fm.get("description").cloned().unwrap_or_default(),
+                model: fm.get("model").cloned().unwrap_or_default(),
+                body,
+                dir_name: file_stem,
+                scope,
+            });
         }
     }
 }

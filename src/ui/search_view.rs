@@ -104,9 +104,10 @@ pub(crate) fn render_search_overlay(
         .highlight_symbol(" > ");
     frame.render_stateful_widget(list, content_chunks[0], &mut list_state);
 
-    // Preview pane
+    // Preview pane — use same clamped index as the list selection
+    let clamped = overlay.selected.min(filtered.len().saturating_sub(1));
     let preview_content = filtered
-        .get(overlay.selected)
+        .get(clamped)
         .and_then(|&i| overlay.all_items.get(i))
         .map(|item| item.preview.as_str())
         .unwrap_or("");

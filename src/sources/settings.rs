@@ -37,7 +37,9 @@ fn deep_merge(base: &mut serde_json::Value, overlay: &serde_json::Value) {
     if let (Some(base_obj), Some(overlay_obj)) = (base.as_object_mut(), overlay.as_object()) {
         for (key, value) in overlay_obj {
             if value.is_object() && base_obj.get(key).map(|v| v.is_object()).unwrap_or(false) {
-                deep_merge(base_obj.get_mut(key).unwrap(), value);
+                if let Some(base_val) = base_obj.get_mut(key) {
+                    deep_merge(base_val, value);
+                }
             } else {
                 base_obj.insert(key.clone(), value.clone());
             }

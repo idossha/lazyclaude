@@ -43,7 +43,12 @@ pub fn load(paths: &Paths) -> Vec<ClaudeMdFile> {
 fn scan_rules_dir(files: &mut Vec<ClaudeMdFile>, dir: &PathBuf, scope: Scope) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
-        Err(_) => return,
+        Err(e) => {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                tracing::warn!("Failed to read rules dir {}: {}", dir.display(), e);
+            }
+            return;
+        }
     };
     for entry in entries.flatten() {
         let path = entry.path();

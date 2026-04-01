@@ -371,6 +371,12 @@ pub enum ConfirmPurpose {
     UnblockPlugin {
         name: String,
     },
+    DenyPermission {
+        scope: Scope,
+        kind: String,
+        index: usize,
+        rule: String,
+    },
     InstallMcpFromRegistry {
         entry: sources::mcp_registry::RegistryEntry,
         scope: Scope,
@@ -395,9 +401,9 @@ pub enum SearchSource {
 impl SearchSource {
     pub fn label(&self) -> &'static str {
         match self {
-            SearchSource::Skills => "Skills Registry (anthropics/skills)",
-            SearchSource::Mcp => "MCP Registry (npm)",
-            SearchSource::Plugins => "Plugin Marketplace",
+            SearchSource::Skills => "Skills (anthropics + composio)",
+            SearchSource::Mcp => "MCP (npm + official + smithery)",
+            SearchSource::Plugins => "Plugins (local + official marketplace)",
         }
     }
 }
@@ -610,20 +616,44 @@ impl App {
         match watcher {
             Ok(mut w) => {
                 // Watch ~/.claude/ recursively (covers memory, skills, agents, settings, etc.)
-                let _ = w.watch(paths.claude_dir.as_ref(), RecursiveMode::Recursive);
+                if let Err(e) = w.watch(paths.claude_dir.as_ref(), RecursiveMode::Recursive) {
+                    tracing::warn!(
+                        "File watcher: failed to watch {}: {}",
+                        paths.claude_dir.display(),
+                        e
+                    );
+                }
                 // Watch <project>/.claude/ recursively (project-level config)
                 let project_claude = paths.project_root.join(".claude");
                 if project_claude.exists() {
-                    let _ = w.watch(project_claude.as_ref(), RecursiveMode::Recursive);
+                    if let Err(e) = w.watch(project_claude.as_ref(), RecursiveMode::Recursive) {
+                        tracing::warn!(
+                            "File watcher: failed to watch {}: {}",
+                            project_claude.display(),
+                            e
+                        );
+                    }
                 }
                 // Watch .mcp.json files (user and project level)
                 let user_mcp = paths.mcp_path("user");
                 if user_mcp.exists() {
-                    let _ = w.watch(&user_mcp, RecursiveMode::NonRecursive);
+                    if let Err(e) = w.watch(&user_mcp, RecursiveMode::NonRecursive) {
+                        tracing::warn!(
+                            "File watcher: failed to watch {}: {}",
+                            user_mcp.display(),
+                            e
+                        );
+                    }
                 }
                 let project_mcp = paths.mcp_path("project");
                 if project_mcp.exists() {
-                    let _ = w.watch(&project_mcp, RecursiveMode::NonRecursive);
+                    if let Err(e) = w.watch(&project_mcp, RecursiveMode::NonRecursive) {
+                        tracing::warn!(
+                            "File watcher: failed to watch {}: {}",
+                            project_mcp.display(),
+                            e
+                        );
+                    }
                 }
                 (Some(w), Some(watch_rx))
             }

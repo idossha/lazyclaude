@@ -123,6 +123,26 @@ impl App {
                     self.data.settings = sources::settings::load(&self.paths);
                 }
             }
+            ConfirmPurpose::DenyPermission {
+                scope,
+                kind,
+                index,
+                rule,
+            } => {
+                // Remove from current list, add to deny
+                if let Err(e) =
+                    sources::settings::remove_permission(&self.paths, scope.as_str(), &kind, index)
+                {
+                    self.set_message(format!("Error removing: {e}"));
+                } else if let Err(e) =
+                    sources::settings::add_permission(&self.paths, scope.as_str(), "deny", &rule)
+                {
+                    self.set_message(format!("Error adding deny: {e}"));
+                } else {
+                    self.set_message(format!("Moved to deny: {rule}"));
+                    self.data.settings = sources::settings::load(&self.paths);
+                }
+            }
             ConfirmPurpose::DeleteMcpServer { scope, name } => {
                 // Save the MCP config before removal for undo
                 let config_snapshot = sources::read_json(&self.paths.mcp_path(scope.as_str()));
@@ -515,12 +535,22 @@ impl App {
                 }
             }
             UndoAction::Skill { dir_path, files } => {
-                let _ = std::fs::create_dir_all(&dir_path);
-                for (file_path, data) in &files {
-                    let _ = std::fs::write(file_path, data);
+                if let Err(e) = std::fs::create_dir_all(&dir_path) {
+                    self.set_message(format!("Undo failed (mkdir): {e}"));
+                } else {
+                    let mut errors = Vec::new();
+                    for (file_path, data) in &files {
+                        if let Err(e) = std::fs::write(file_path, data) {
+                            errors.push(format!("{}: {e}", file_path.display()));
+                        }
+                    }
+                    if errors.is_empty() {
+                        self.set_message("Undo: restored skill".to_string());
+                    } else {
+                        self.set_message(format!("Undo partial failure: {}", errors.join(", ")));
+                    }
+                    self.data.skills = sources::skills::load(&self.paths);
                 }
-                self.set_message("Undo: restored skill".to_string());
-                self.data.skills = sources::skills::load(&self.paths);
             }
             UndoAction::Command { file_path, content } => {
                 if let Some(parent) = file_path.parent() {

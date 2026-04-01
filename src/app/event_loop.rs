@@ -17,7 +17,15 @@ impl App {
                 .ok();
 
                 // Run editor — blocks until user closes it
-                let _ = std::process::Command::new(&editor).arg(&path).status();
+                match std::process::Command::new(&editor).arg(&path).status() {
+                    Ok(status) if !status.success() => {
+                        self.set_message(format!("Editor exited with {status}"));
+                    }
+                    Err(e) => {
+                        self.set_message(format!("Failed to launch editor '{editor}': {e}"));
+                    }
+                    _ => {}
+                }
 
                 // Return to TUI mode
                 crossterm::execute!(
