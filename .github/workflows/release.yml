@@ -82,3 +82,82 @@ jobs:
             --title "$tag" \
             --generate-notes \
             *.tar.gz
+
+  homebrew:
+    name: Update Homebrew Formula
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Compute SHA256 hashes
+        id: hashes
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "sha_aarch64_mac=$(sha256sum lazyclaude-${tag}-aarch64-apple-darwin.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "sha_x86_64_mac=$(sha256sum lazyclaude-${tag}-x86_64-apple-darwin.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "sha_aarch64_linux=$(sha256sum lazyclaude-${tag}-aarch64-unknown-linux-gnu.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "sha_x86_64_linux=$(sha256sum lazyclaude-${tag}-x86_64-unknown-linux-gnu.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Generate formula and push to tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION="${{ steps.hashes.outputs.version }}"
+          SHA_AARCH64_MAC="${{ steps.hashes.outputs.sha_aarch64_mac }}"
+          SHA_X86_64_MAC="${{ steps.hashes.outputs.sha_x86_64_mac }}"
+          SHA_AARCH64_LINUX="${{ steps.hashes.outputs.sha_aarch64_linux }}"
+          SHA_X86_64_LINUX="${{ steps.hashes.outputs.sha_x86_64_linux }}"
+
+          cat > lazyclaude.rb << FORMULA
+          class Lazyclaude < Formula
+            desc "A lazygit-inspired TUI for managing Claude Code configuration"
+            homepage "https://github.com/idossha/lazyclaude"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/idossha/lazyclaude/releases/download/v#{version}/lazyclaude-v#{version}-aarch64-apple-darwin.tar.gz"
+                sha256 "${SHA_AARCH64_MAC}"
+              else
+                url "https://github.com/idossha/lazyclaude/releases/download/v#{version}/lazyclaude-v#{version}-x86_64-apple-darwin.tar.gz"
+                sha256 "${SHA_X86_64_MAC}"
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.arm?
+                url "https://github.com/idossha/lazyclaude/releases/download/v#{version}/lazyclaude-v#{version}-aarch64-unknown-linux-gnu.tar.gz"
+                sha256 "${SHA_AARCH64_LINUX}"
+              else
+                url "https://github.com/idossha/lazyclaude/releases/download/v#{version}/lazyclaude-v#{version}-x86_64-unknown-linux-gnu.tar.gz"
+                sha256 "${SHA_X86_64_LINUX}"
+              end
+            end
+
+            def install
+              bin.install "lazyclaude"
+            end
+
+            test do
+              assert_match "lazyclaude", shell_output("#{bin}/lazyclaude --version")
+            end
+          end
+          FORMULA
+
+          # Remove leading whitespace from heredoc
+          sed -i 's/^          //' lazyclaude.rb
+
+          # Clone tap, update formula, push
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/idossha/homebrew-lazyclaude.git" tap
+          cp lazyclaude.rb tap/Formula/lazyclaude.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/lazyclaude.rb
+          git commit -m "update lazyclaude to ${VERSION}"
+          git push
