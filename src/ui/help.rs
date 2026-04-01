@@ -1,17 +1,18 @@
 use ratatui::{
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
 
 use crate::app::Panel;
+use super::theme::THEME;
 
 pub(crate) fn render_help(frame: &mut Frame, panel: Panel, scroll: usize, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan))
+        .border_style(Style::default().fg(THEME.border_focused))
         .title(format!(" Help: {} ", panel.label()));
 
     let inner = block.inner(area);
@@ -396,26 +397,26 @@ fn section(title: &str) -> Line<'_> {
     Line::from(Span::styled(
         title,
         Style::default()
-            .fg(Color::Cyan)
+            .fg(THEME.text_accent)
             .add_modifier(Modifier::BOLD),
     ))
 }
 
 fn body(text: &str) -> Line<'_> {
-    Line::from(Span::styled(text, Style::default().fg(Color::White)))
+    Line::from(Span::styled(text, Style::default().fg(THEME.text_primary)))
 }
 
 fn dim(text: &str) -> Line<'_> {
-    Line::from(Span::styled(text, Style::default().fg(Color::DarkGray)))
+    Line::from(Span::styled(text, Style::default().fg(THEME.text_secondary)))
 }
 
 fn key_line<'a>(key: &'a str, desc: &'a str) -> Line<'a> {
     Line::from(vec![
         Span::styled(
             format!("    {:<10}", key),
-            Style::default().fg(Color::Yellow),
+            Style::default().fg(THEME.text_emphasis),
         ),
-        Span::styled(desc, Style::default().fg(Color::White)),
+        Span::styled(desc, Style::default().fg(THEME.text_primary)),
     ])
 }
 
@@ -423,9 +424,9 @@ fn location_line<'a>(label: &'a str, path: &'a str) -> Line<'a> {
     Line::from(vec![
         Span::styled(
             format!("    {:<14}", label),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(THEME.text_secondary),
         ),
-        Span::styled(path, Style::default().fg(Color::Green)),
+        Span::styled(path, Style::default().fg(THEME.text_success)),
     ])
 }
 
@@ -433,12 +434,12 @@ fn ref_line<'a>(label: &'a str, url: &'a str) -> Line<'a> {
     Line::from(vec![
         Span::styled(
             format!("    {:<14}", label),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(THEME.text_secondary),
         ),
         Span::styled(
             url,
             Style::default()
-                .fg(Color::Blue)
+                .fg(THEME.text_link)
                 .add_modifier(Modifier::UNDERLINED),
         ),
     ])

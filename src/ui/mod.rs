@@ -4,13 +4,15 @@ mod help;
 mod markdown;
 mod search_view;
 mod stats_view;
+pub mod theme;
 
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
 use crate::app::{App, InputMode};
+use theme::THEME;
 
 pub fn render(frame: &mut Frame, app: &mut App) {
     dashboard::render(frame, app);
@@ -37,11 +39,11 @@ fn render_overlay(frame: &mut Frame, app: &App) {
             frame.render_widget(Clear, input_area);
             let block = Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Cyan))
+                .border_style(Style::default().fg(THEME.input_border))
                 .title(format!(" {} ", state.prompt));
             let paragraph = Paragraph::new(state.value.as_str())
                 .block(block)
-                .style(Style::default().fg(Color::White));
+                .style(Style::default().fg(THEME.input_text));
             frame.render_widget(paragraph, input_area);
 
             let cursor_x =
@@ -58,12 +60,12 @@ fn render_overlay(frame: &mut Frame, app: &App) {
             frame.render_widget(Clear, confirm_area);
             let block = Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Yellow))
+                .border_style(Style::default().fg(THEME.confirm_border))
                 .title(" Confirm ");
             let text = format!("{} (y/n)", state.message);
             let paragraph = Paragraph::new(text)
                 .block(block)
-                .style(Style::default().fg(Color::Yellow));
+                .style(Style::default().fg(THEME.confirm_text));
             frame.render_widget(paragraph, confirm_area);
         }
     }
@@ -78,7 +80,7 @@ fn render_message(frame: &mut Frame, app: &mut App) {
             width: area.width.saturating_sub(4).min(msg.len() as u16 + 2),
             height: 1,
         };
-        let paragraph = Paragraph::new(msg.clone()).style(Style::default().fg(Color::Green));
+        let paragraph = Paragraph::new(msg.clone()).style(Style::default().fg(THEME.message_fg));
         frame.render_widget(paragraph, msg_area);
 
         // Decrement TTL; clear message when expired

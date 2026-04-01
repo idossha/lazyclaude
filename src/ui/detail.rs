@@ -1,13 +1,15 @@
 use std::path::PathBuf;
 
 use ratatui::{
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::ListItem,
 };
 
 use crate::app::{App, Panel};
 use lazyclaude::sources::Scope;
+
+use super::theme::THEME;
 
 pub(crate) type ItemRow = (ListItem<'static>, Option<PathBuf>, Option<String>);
 
@@ -32,10 +34,10 @@ pub(crate) fn build_detail_items(
             // First item: Global
             let style = if app.selected_project == 0 {
                 Style::default()
-                    .fg(Color::Green)
+                    .fg(THEME.text_success)
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(THEME.text_primary)
             };
             items.push(ListItem::new(Line::from(vec![
                 Span::styled("  ", Style::default()),
@@ -50,19 +52,19 @@ pub(crate) fn build_detail_items(
                 }
                 let selected = app.selected_project == i + 1;
                 let color = if selected {
-                    Color::Green
+                    THEME.text_success
                 } else if project.exists {
-                    Color::White
+                    THEME.text_primary
                 } else {
-                    Color::DarkGray
+                    THEME.text_secondary
                 };
                 let marker = if selected { " *" } else { "" };
                 items.push(ListItem::new(Line::from(vec![
                     Span::styled("  ", Style::default()),
                     Span::styled(project.short_name.clone(), Style::default().fg(color)),
-                    Span::styled(marker.to_string(), Style::default().fg(Color::Green)),
+                    Span::styled(marker.to_string(), Style::default().fg(THEME.text_success)),
                     if !project.exists {
-                        Span::styled(" (missing)", Style::default().fg(Color::Red))
+                        Span::styled(" (missing)", Style::default().fg(THEME.text_danger))
                     } else {
                         Span::styled("", Style::default())
                     },
@@ -131,8 +133,8 @@ pub(crate) fn build_detail_items(
                 let badge = format!("[{}]", &f.mem_type[..f.mem_type.len().min(4)]);
                 items.push(ListItem::new(Line::from(vec![
                     Span::styled("  ", Style::default()),
-                    Span::styled(f.name.clone(), Style::default().fg(Color::Green)),
-                    Span::styled(format!("  {badge}"), Style::default().fg(Color::Cyan)),
+                    Span::styled(f.name.clone(), Style::default().fg(THEME.text_success)),
+                    Span::styled(format!("  {badge}"), Style::default().fg(THEME.text_accent)),
                 ])));
                 paths.push(Some(f.path.clone()));
                 bodies.push(Some(f.body.clone()));
@@ -286,7 +288,7 @@ pub(crate) fn build_detail_items(
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  Allow",
                     Style::default()
-                        .fg(Color::Green)
+                        .fg(THEME.text_success)
                         .add_modifier(Modifier::BOLD),
                 ))));
                 paths.push(None);
@@ -297,10 +299,10 @@ pub(crate) fn build_detail_items(
                     }
                     items.push(ListItem::new(Line::from(vec![
                         Span::styled("    ", Style::default()),
-                        Span::styled(rule.rule.clone(), Style::default().fg(Color::White)),
+                        Span::styled(rule.rule.clone(), Style::default().fg(THEME.text_primary)),
                         Span::styled(
                             format!("  [{}]", rule.scope),
-                            Style::default().fg(Color::Cyan),
+                            Style::default().fg(THEME.text_accent),
                         ),
                     ])));
                     paths.push(Some(PathBuf::from(format!(
@@ -317,7 +319,7 @@ pub(crate) fn build_detail_items(
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  Ask",
                     Style::default()
-                        .fg(Color::Yellow)
+                        .fg(THEME.text_emphasis)
                         .add_modifier(Modifier::BOLD),
                 ))));
                 paths.push(None);
@@ -328,10 +330,10 @@ pub(crate) fn build_detail_items(
                     }
                     items.push(ListItem::new(Line::from(vec![
                         Span::styled("    ", Style::default()),
-                        Span::styled(rule.rule.clone(), Style::default().fg(Color::White)),
+                        Span::styled(rule.rule.clone(), Style::default().fg(THEME.text_primary)),
                         Span::styled(
                             format!("  [{}]", rule.scope),
-                            Style::default().fg(Color::Yellow),
+                            Style::default().fg(THEME.text_emphasis),
                         ),
                     ])));
                     paths.push(Some(PathBuf::from(format!(
@@ -347,7 +349,7 @@ pub(crate) fn build_detail_items(
             if !perms.deny.is_empty() {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  Deny",
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                    Style::default().fg(THEME.text_danger).add_modifier(Modifier::BOLD),
                 ))));
                 paths.push(None);
                 bodies.push(None);
@@ -357,10 +359,10 @@ pub(crate) fn build_detail_items(
                     }
                     items.push(ListItem::new(Line::from(vec![
                         Span::styled("    ", Style::default()),
-                        Span::styled(rule.rule.clone(), Style::default().fg(Color::White)),
+                        Span::styled(rule.rule.clone(), Style::default().fg(THEME.text_primary)),
                         Span::styled(
                             format!("  [{}]", rule.scope),
-                            Style::default().fg(Color::Red),
+                            Style::default().fg(THEME.text_danger),
                         ),
                     ])));
                     paths.push(Some(PathBuf::from(format!(
@@ -379,7 +381,7 @@ pub(crate) fn build_detail_items(
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  Hooks",
                     Style::default()
-                        .fg(Color::Yellow)
+                        .fg(THEME.text_emphasis)
                         .add_modifier(Modifier::BOLD),
                 ))));
                 paths.push(None);
@@ -394,7 +396,7 @@ pub(crate) fn build_detail_items(
                         items.push(ListItem::new(Line::from(Span::styled(
                             format!("    {cur_event}"),
                             Style::default()
-                                .fg(Color::Cyan)
+                                .fg(THEME.text_accent)
                                 .add_modifier(Modifier::BOLD),
                         ))));
                         paths.push(None);
@@ -402,9 +404,9 @@ pub(crate) fn build_detail_items(
                     }
                     items.push(ListItem::new(Line::from(vec![
                         Span::styled("      ", Style::default()),
-                        Span::styled(hook.matcher.clone(), Style::default().fg(Color::Green)),
-                        Span::styled(" -> ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(hook.command.clone(), Style::default().fg(Color::White)),
+                        Span::styled(hook.matcher.clone(), Style::default().fg(THEME.text_success)),
+                        Span::styled(" -> ", Style::default().fg(THEME.text_secondary)),
+                        Span::styled(hook.command.clone(), Style::default().fg(THEME.text_primary)),
                     ])));
                     paths.push(None);
                     bodies.push(Some(format!(
@@ -424,7 +426,7 @@ pub(crate) fn build_detail_items(
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  Keybindings",
                     Style::default()
-                        .fg(Color::Yellow)
+                        .fg(THEME.text_emphasis)
                         .add_modifier(Modifier::BOLD),
                 ))));
                 paths.push(None);
@@ -438,16 +440,16 @@ pub(crate) fn build_detail_items(
                         Span::styled(
                             b.key.clone(),
                             Style::default()
-                                .fg(Color::Yellow)
+                                .fg(THEME.text_emphasis)
                                 .add_modifier(Modifier::BOLD),
                         ),
-                        Span::styled(" -> ", Style::default().fg(Color::DarkGray)),
-                        Span::styled(b.command.clone(), Style::default().fg(Color::White)),
+                        Span::styled(" -> ", Style::default().fg(THEME.text_secondary)),
+                        Span::styled(b.command.clone(), Style::default().fg(THEME.text_primary)),
                     ];
                     if !b.context.is_empty() {
                         spans.push(Span::styled(
                             format!("  [{}]", b.context),
-                            Style::default().fg(Color::Cyan),
+                            Style::default().fg(THEME.text_accent),
                         ));
                     }
                     items.push(ListItem::new(Line::from(spans)));
@@ -475,7 +477,7 @@ pub(crate) fn build_detail_items(
                     items.push(ListItem::new(Line::from(Span::styled(
                         "  General",
                         Style::default()
-                            .fg(Color::Yellow)
+                            .fg(THEME.text_emphasis)
                             .add_modifier(Modifier::BOLD),
                     ))));
                     paths.push(None);
@@ -509,9 +511,9 @@ pub(crate) fn build_detail_items(
 
                         items.push(ListItem::new(Line::from(vec![
                             Span::styled("    ", Style::default()),
-                            Span::styled(key.to_string(), Style::default().fg(Color::Cyan)),
-                            Span::styled(": ", Style::default().fg(Color::DarkGray)),
-                            Span::styled(val_str, Style::default().fg(Color::White)),
+                            Span::styled(key.to_string(), Style::default().fg(THEME.text_accent)),
+                            Span::styled(": ", Style::default().fg(THEME.text_secondary)),
+                            Span::styled(val_str, Style::default().fg(THEME.text_primary)),
                         ])));
                         paths.push(None);
                         bodies.push(Some(body));
@@ -537,10 +539,10 @@ pub(crate) fn build_detail_items(
                     Span::styled("  ", Style::default()),
                     Span::styled(
                         session.id[..session.id.len().min(8)].to_string(),
-                        Style::default().fg(Color::Yellow),
+                        Style::default().fg(THEME.text_emphasis),
                     ),
-                    Span::styled(format!("  {size}"), Style::default().fg(Color::DarkGray)),
-                    Span::styled(format!("  {summary}"), Style::default().fg(Color::White)),
+                    Span::styled(format!("  {size}"), Style::default().fg(THEME.text_secondary)),
+                    Span::styled(format!("  {summary}"), Style::default().fg(THEME.text_primary)),
                 ])));
                 paths.push(Some(session.path.clone()));
                 bodies.push(None);
@@ -548,7 +550,7 @@ pub(crate) fn build_detail_items(
             if app.data.sessions.is_empty() {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  No sessions",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(THEME.text_secondary),
                 ))));
                 paths.push(None);
                 bodies.push(None);
@@ -565,9 +567,9 @@ pub(crate) fn build_detail_items(
                     continue;
                 }
                 let (badge, color) = match todo.status.as_str() {
-                    "completed" => ("\u{2714}", Color::Green),    // checkmark
-                    "in_progress" => ("\u{25cb}", Color::Yellow), // circle
-                    _ => ("\u{25cb}", Color::Cyan),               // circle
+                    "completed" => ("\u{2714}", THEME.text_success),
+                    "in_progress" => ("\u{25cb}", THEME.text_emphasis),
+                    _ => ("\u{25cb}", THEME.text_accent),
                 };
                 let text = if todo.content.chars().count() > 80 {
                     let truncated: String = todo.content.chars().take(77).collect();
@@ -578,7 +580,7 @@ pub(crate) fn build_detail_items(
                 items.push(ListItem::new(Line::from(vec![
                     Span::styled("  ", Style::default()),
                     Span::styled(format!("{badge} "), Style::default().fg(color)),
-                    Span::styled(text, Style::default().fg(Color::White)),
+                    Span::styled(text, Style::default().fg(THEME.text_primary)),
                 ])));
                 paths.push(None);
                 bodies.push(None);
@@ -586,7 +588,7 @@ pub(crate) fn build_detail_items(
             if app.data.todos.is_empty() {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  No todos",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(THEME.text_secondary),
                 ))));
                 paths.push(None);
                 bodies.push(None);
@@ -599,7 +601,7 @@ pub(crate) fn build_detail_items(
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  Installed",
                     Style::default()
-                        .fg(Color::Green)
+                        .fg(THEME.text_success)
                         .add_modifier(Modifier::BOLD),
                 ))));
                 paths.push(None);
@@ -609,15 +611,15 @@ pub(crate) fn build_detail_items(
                         continue;
                     }
                     items.push(ListItem::new(Line::from(vec![
-                        Span::styled("    \u{25cf} ", Style::default().fg(Color::Green)),
-                        Span::styled(plugin.name.clone(), Style::default().fg(Color::White)),
+                        Span::styled("    \u{25cf} ", Style::default().fg(THEME.text_success)),
+                        Span::styled(plugin.name.clone(), Style::default().fg(THEME.text_primary)),
                         Span::styled(
                             format!("  v{}", plugin.version),
-                            Style::default().fg(Color::Cyan),
+                            Style::default().fg(THEME.text_accent),
                         ),
                         Span::styled(
                             format!("  [{}]", plugin.scope),
-                            Style::default().fg(Color::DarkGray),
+                            Style::default().fg(THEME.text_secondary),
                         ),
                     ])));
                     paths.push(Some(PathBuf::from(format!(
@@ -630,7 +632,7 @@ pub(crate) fn build_detail_items(
             if !p.blocked.is_empty() {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  Blocked",
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                    Style::default().fg(THEME.text_danger).add_modifier(Modifier::BOLD),
                 ))));
                 paths.push(None);
                 bodies.push(None);
@@ -639,11 +641,11 @@ pub(crate) fn build_detail_items(
                         continue;
                     }
                     items.push(ListItem::new(Line::from(vec![
-                        Span::styled("    \u{25cf} ", Style::default().fg(Color::Red)),
-                        Span::styled(plugin.name.clone(), Style::default().fg(Color::DarkGray)),
+                        Span::styled("    \u{25cf} ", Style::default().fg(THEME.text_danger)),
+                        Span::styled(plugin.name.clone(), Style::default().fg(THEME.text_secondary)),
                         Span::styled(
                             format!("  {}", plugin.reason),
-                            Style::default().fg(Color::Red),
+                            Style::default().fg(THEME.text_danger),
                         ),
                     ])));
                     paths.push(Some(PathBuf::from(format!(
@@ -657,7 +659,7 @@ pub(crate) fn build_detail_items(
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  Marketplaces",
                     Style::default()
-                        .fg(Color::Yellow)
+                        .fg(THEME.text_emphasis)
                         .add_modifier(Modifier::BOLD),
                 ))));
                 paths.push(None);
@@ -668,10 +670,10 @@ pub(crate) fn build_detail_items(
                     }
                     items.push(ListItem::new(Line::from(vec![
                         Span::styled("    ", Style::default()),
-                        Span::styled(mp.name.clone(), Style::default().fg(Color::Yellow)),
+                        Span::styled(mp.name.clone(), Style::default().fg(THEME.text_emphasis)),
                         Span::styled(
                             format!("  {}", mp.repo),
-                            Style::default().fg(Color::DarkGray),
+                            Style::default().fg(THEME.text_secondary),
                         ),
                     ])));
                     paths.push(Some(PathBuf::from(format!(
@@ -684,7 +686,7 @@ pub(crate) fn build_detail_items(
             if p.installed.is_empty() && p.blocked.is_empty() && p.marketplaces.is_empty() {
                 items.push(ListItem::new(Line::from(Span::styled(
                     "  No plugins",
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(THEME.text_secondary),
                 ))));
                 paths.push(None);
                 bodies.push(None);
@@ -701,7 +703,7 @@ pub(crate) fn scope_header(label: &str) -> ListItem<'static> {
     ListItem::new(Line::from(Span::styled(
         format!("  {label}"),
         Style::default()
-            .fg(Color::Yellow)
+            .fg(THEME.text_emphasis)
             .add_modifier(Modifier::BOLD),
     )))
 }
@@ -709,7 +711,7 @@ pub(crate) fn scope_header(label: &str) -> ListItem<'static> {
 pub(crate) fn empty_hint(msg: &str) -> ListItem<'static> {
     ListItem::new(Line::from(Span::styled(
         format!("    {msg}"),
-        Style::default().fg(Color::DarkGray),
+        Style::default().fg(THEME.text_secondary),
     )))
 }
 
@@ -740,9 +742,9 @@ pub(crate) fn push_scope_group(
 
 pub(crate) fn skill_item(s: &lazyclaude::sources::Skill) -> ListItem<'static> {
     let (badge, color) = if s.user_invocable {
-        ("[inv]", Color::Green)
+        ("[inv]", THEME.text_success)
     } else {
-        ("[int]", Color::DarkGray)
+        ("[int]", THEME.text_secondary)
     };
     ListItem::new(Line::from(vec![
         Span::styled("    ", Style::default()),
@@ -754,12 +756,12 @@ pub(crate) fn skill_item(s: &lazyclaude::sources::Skill) -> ListItem<'static> {
 pub(crate) fn agent_item(a: &lazyclaude::sources::Agent) -> ListItem<'static> {
     let mut spans = vec![
         Span::styled("    ", Style::default()),
-        Span::styled(a.name.clone(), Style::default().fg(Color::Green)),
+        Span::styled(a.name.clone(), Style::default().fg(THEME.text_success)),
     ];
     if !a.model.is_empty() {
         spans.push(Span::styled(
             format!("  {}", a.model),
-            Style::default().fg(Color::Yellow),
+            Style::default().fg(THEME.text_emphasis),
         ));
     }
     ListItem::new(Line::from(spans))
@@ -767,16 +769,16 @@ pub(crate) fn agent_item(a: &lazyclaude::sources::Agent) -> ListItem<'static> {
 
 pub(crate) fn mcp_item(s: &lazyclaude::sources::McpServer) -> ListItem<'static> {
     let (badge, badge_color, name_color) = if s.disabled {
-        ("  \u{25cf}", Color::Red, Color::DarkGray)
+        ("  \u{25cf}", THEME.text_danger, THEME.text_secondary)
     } else {
-        ("  \u{25cf}", Color::Green, Color::White)
+        ("  \u{25cf}", THEME.text_success, THEME.text_primary)
     };
     let cmd = format!("{} {}", s.command, s.args.join(" "));
     ListItem::new(Line::from(vec![
         Span::styled("   ", Style::default()),
         Span::styled(badge, Style::default().fg(badge_color)),
         Span::styled(format!(" {}", s.name), Style::default().fg(name_color)),
-        Span::styled(format!("  {cmd}"), Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("  {cmd}"), Style::default().fg(THEME.text_secondary)),
     ]))
 }
 
@@ -784,11 +786,11 @@ pub(crate) fn command_item(c: &lazyclaude::sources::Command) -> ListItem<'static
     let scope_tag = format!("[{}]", c.scope);
     ListItem::new(Line::from(vec![
         Span::styled("    ", Style::default()),
-        Span::styled(format!("/{}", c.name), Style::default().fg(Color::Cyan)),
-        Span::styled("  [cmd]", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("/{}", c.name), Style::default().fg(THEME.text_accent)),
+        Span::styled("  [cmd]", Style::default().fg(THEME.text_secondary)),
         Span::styled(
             format!("  {scope_tag}"),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(THEME.text_secondary),
         ),
     ]))
 }
@@ -802,10 +804,10 @@ pub(crate) fn claude_md_item(f: &lazyclaude::sources::ClaudeMdFile) -> ListItem<
     let tag = if f.file_type == "rule" { " [rule]" } else { "" };
     ListItem::new(Line::from(vec![
         Span::styled("    ", Style::default()),
-        Span::styled(f.name.clone(), Style::default().fg(Color::Green)),
+        Span::styled(f.name.clone(), Style::default().fg(THEME.text_success)),
         Span::styled(
             format!("{tag}  {size}"),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(THEME.text_secondary),
         ),
     ]))
 }

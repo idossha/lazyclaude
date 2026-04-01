@@ -1,6 +1,6 @@
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
     Frame,
@@ -9,15 +9,7 @@ use ratatui::{
 use crate::app::App;
 use lazyclaude::sources::stats::{self, StatsData, StatsPeriod};
 
-// ── Heat-map color palette (5 levels, GitHub-style) ─────────────────
-
-const HEAT_COLORS: [Color; 5] = [
-    Color::Indexed(236), // 0: no activity — dark gray
-    Color::Indexed(22),  // 1: low — dark green
-    Color::Indexed(28),  // 2: medium — green
-    Color::Indexed(34),  // 3: high — bright green
-    Color::Indexed(40),  // 4: very high — vivid green
-];
+use super::theme::THEME;
 
 /// Compute quartile thresholds from non-zero daily message counts.
 fn quartile_thresholds(stats: &StatsData) -> [u64; 4] {
@@ -61,15 +53,6 @@ const MONTH_ABBR: [&str; 12] = [
 ];
 const DAY_LABELS: [&str; 7] = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-const MODEL_COLORS: [Color; 6] = [
-    Color::Cyan,
-    Color::Green,
-    Color::Yellow,
-    Color::Magenta,
-    Color::Blue,
-    Color::Red,
-];
-
 // ── Main entry point ────────────────────────────────────────────────
 
 pub(crate) fn render_stats_dashboard(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -81,11 +64,11 @@ pub(crate) fn render_stats_dashboard(frame: &mut Frame, app: &mut App, area: Rec
             Line::from(""),
             Line::from(Span::styled(
                 "  No stats data available.",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(THEME.text_secondary),
             )),
             Line::from(Span::styled(
                 "  Use Claude Code to generate activity.",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(THEME.text_secondary),
             )),
         ]);
         frame.render_widget(msg, area);
@@ -124,9 +107,9 @@ fn render_period_tabs(frame: &mut Frame, period: StatsPeriod, area: Rect) {
         StatsPeriod::Last30Days,
     ];
     let active = Style::default()
-        .fg(Color::Cyan)
+        .fg(THEME.text_accent)
         .add_modifier(Modifier::BOLD);
-    let dim = Style::default().fg(Color::DarkGray);
+    let dim = Style::default().fg(THEME.text_secondary);
 
     let mut spans: Vec<Span> = vec![Span::styled("  ", Style::default())];
     for (i, &p) in periods.iter().enumerate() {
@@ -164,10 +147,10 @@ fn render_overview(
     area: Rect,
 ) {
     let bold = Style::default()
-        .fg(Color::White)
+        .fg(THEME.text_primary)
         .add_modifier(Modifier::BOLD);
-    let dim = Style::default().fg(Color::DarkGray);
-    let yellow = Style::default().fg(Color::Yellow);
+    let dim = Style::default().fg(THEME.text_secondary);
+    let yellow = Style::default().fg(THEME.text_emphasis);
 
     let mut lines = vec![
         Line::from(vec![
@@ -202,7 +185,7 @@ fn render_overview(
             Span::styled(" cache hit  ", dim),
             Span::styled(
                 pretty_date(&summary.most_active_day),
-                Style::default().fg(Color::Cyan),
+                Style::default().fg(THEME.text_accent),
             ),
             Span::styled(
                 format!(" ({})", format_number(summary.most_active_day_msgs)),
@@ -223,7 +206,7 @@ fn render_overview(
     let fav = shorten_model_name(&summary.favorite_model);
     lines.push(Line::from(vec![
         Span::styled("  Fav: ", dim),
-        Span::styled(fav, Style::default().fg(Color::Cyan)),
+        Span::styled(fav, Style::default().fg(THEME.text_accent)),
         Span::styled("  Total: ", dim),
         Span::styled(format_tokens(summary.total_tokens), bold),
         Span::styled(" tokens", dim),
@@ -231,16 +214,16 @@ fn render_overview(
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(Span::styled(" Overview ", Style::default().fg(Color::Cyan)));
+        .border_style(Style::default().fg(THEME.border_unfocused))
+        .title(Span::styled(" Overview ", Style::default().fg(THEME.text_accent)));
     frame.render_widget(Paragraph::new(lines).block(block), area);
 }
 
 fn render_models(frame: &mut Frame, stats: &StatsData, _summary: &stats::StatsSummary, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(Span::styled(" Models ", Style::default().fg(Color::Cyan)));
+        .border_style(Style::default().fg(THEME.border_unfocused))
+        .title(Span::styled(" Models ", Style::default().fg(THEME.text_accent)));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -249,7 +232,7 @@ fn render_models(frame: &mut Frame, stats: &StatsData, _summary: &stats::StatsSu
     }
 
     let grand_total: u64 = stats.model_usage.iter().map(|m| m.total_tokens).sum();
-    let dim = Style::default().fg(Color::DarkGray);
+    let dim = Style::default().fg(THEME.text_secondary);
 
     for (i, model) in stats.model_usage.iter().enumerate() {
         if i as u16 >= inner.height {
@@ -268,11 +251,11 @@ fn render_models(frame: &mut Frame, stats: &StatsData, _summary: &stats::StatsSu
         } else {
             0.0
         };
-        let color = MODEL_COLORS[i % MODEL_COLORS.len()];
+        let color = THEME.model_colors[i % THEME.model_colors.len()];
 
         let line = Line::from(vec![
             Span::styled(format!(" {:<14}", short), Style::default().fg(color)),
-            Span::styled(format!("{:>5.1}%", pct), Style::default().fg(Color::White)),
+            Span::styled(format!("{:>5.1}%", pct), Style::default().fg(THEME.text_primary)),
             Span::styled(
                 format!(
                     "  {} in / {} out",
@@ -294,8 +277,8 @@ fn render_heatmap(frame: &mut Frame, app: &mut App, area: Rect) {
     let stats = &app.data.stats;
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(Span::styled(" Activity ", Style::default().fg(Color::Cyan)));
+        .border_style(Style::default().fg(THEME.border_unfocused))
+        .title(Span::styled(" Activity ", Style::default().fg(THEME.text_accent)));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -345,7 +328,7 @@ fn render_heatmap(frame: &mut Frame, app: &mut App, area: Rect) {
 
     // ── Month labels ────────────────────────────────────────────────
     let buf = frame.buffer_mut();
-    let label_style = Style::default().fg(Color::DarkGray);
+    let label_style = Style::default().fg(THEME.chart_label);
     let mut label_end_x = grid_x; // tracks rightmost x written to avoid overlap
     let mut prev_month = 0u32;
 
@@ -417,7 +400,7 @@ fn render_heatmap(frame: &mut Frame, app: &mut App, area: Rect) {
                 .unwrap_or(0);
 
             let level = heat_level(msgs, &qthresh);
-            let fg = HEAT_COLORS[level];
+            let fg = THEME.heat_colors[level];
 
             let x = col_x[col];
             let w = col_w[col];
@@ -442,10 +425,10 @@ fn render_heatmap(frame: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
-    let dim = Style::default().fg(Color::DarkGray);
-    let white = Style::default().fg(Color::White);
+    let dim = Style::default().fg(THEME.text_secondary);
+    let white = Style::default().fg(THEME.text_primary);
     let mut spans: Vec<Span> = vec![Span::styled(" Less ", dim)];
-    for &c in &HEAT_COLORS {
+    for &c in &THEME.heat_colors {
         spans.push(Span::styled("\u{2588}", Style::default().fg(c)));
     }
     spans.push(Span::styled(" More", dim));
@@ -455,7 +438,7 @@ fn render_heatmap(frame: &mut Frame, app: &mut App, area: Rect) {
     if !selected.is_empty() {
         let pretty = pretty_date(selected);
         spans.push(Span::styled("   ", Style::default()));
-        spans.push(Span::styled(pretty, Style::default().fg(Color::Cyan)));
+        spans.push(Span::styled(pretty, Style::default().fg(THEME.text_accent)));
 
         if let Some(&idx) = app.data.stats.daily_lookup.get(selected) {
             let day = &app.data.stats.daily_activity[idx];
@@ -490,10 +473,10 @@ fn render_tokens_chart(frame: &mut Frame, app: &mut App, area: Rect) {
     let stats = &app.data.stats;
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
+        .border_style(Style::default().fg(THEME.border_unfocused))
         .title(Span::styled(
             " Tokens per Day ",
-            Style::default().fg(Color::Cyan),
+            Style::default().fg(THEME.text_accent),
         ));
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -523,7 +506,7 @@ fn render_tokens_chart(frame: &mut Frame, app: &mut App, area: Rect) {
         .collect();
 
     if filtered.is_empty() {
-        let dim = Style::default().fg(Color::DarkGray);
+        let dim = Style::default().fg(THEME.text_secondary);
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled("  No token data", dim))),
             Rect {
@@ -566,7 +549,7 @@ fn render_tokens_chart(frame: &mut Frame, app: &mut App, area: Rect) {
     let extra_cols = chart_w % n_days;
 
     let buf = frame.buffer_mut();
-    let dim_style = Style::default().fg(Color::DarkGray);
+    let dim_style = Style::default().fg(THEME.chart_label);
 
     // ── Y-axis labels (top, middle, bottom) ─────────────────────────
     let label_positions = [0usize, chart_rows / 2, chart_rows.saturating_sub(1)];
@@ -623,7 +606,7 @@ fn render_tokens_chart(frame: &mut Frame, app: &mut App, area: Rect) {
 
     // ── Draw each model's line ──────────────────────────────────────
     for &(mi, ref values) in &model_series {
-        let color = MODEL_COLORS[mi % MODEL_COLORS.len()];
+        let color = THEME.model_colors[mi % THEME.model_colors.len()];
         let style = Style::default().fg(color);
 
         // Map every day to a Y position — zero values go to baseline
@@ -759,7 +742,7 @@ fn render_tokens_chart(frame: &mut Frame, app: &mut App, area: Rect) {
     if legend_y < inner.y + inner.height {
         let mut spans: Vec<Span> = vec![Span::styled("  ", Style::default())];
         for &(mi, _) in model_series.iter().rev() {
-            let color = MODEL_COLORS[mi % MODEL_COLORS.len()];
+            let color = THEME.model_colors[mi % THEME.model_colors.len()];
             let name = shorten_model_name(&models[mi]);
             spans.push(Span::styled("\u{25CF} ", Style::default().fg(color)));
             spans.push(Span::styled(format!("{name}  "), dim_style));
@@ -786,10 +769,10 @@ const EIGHTH_BLOCKS: [char; 9] = [
 fn render_hourly(frame: &mut Frame, stats: &StatsData, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
+        .border_style(Style::default().fg(THEME.border_unfocused))
         .title(Span::styled(
             " Activity by Hour ",
-            Style::default().fg(Color::Cyan),
+            Style::default().fg(THEME.text_accent),
         ));
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -805,8 +788,8 @@ fn render_hourly(frame: &mut Frame, stats: &StatsData, area: Rect) {
     let base_w = inner.width as usize / 24;
     let extra = inner.width as usize % 24;
 
-    let bar_style = Style::default().fg(Color::Cyan);
-    let label_style = Style::default().fg(Color::DarkGray);
+    let bar_style = Style::default().fg(THEME.chart_bar);
+    let label_style = Style::default().fg(THEME.chart_label);
 
     let buf = frame.buffer_mut();
     let mut x = inner.x;

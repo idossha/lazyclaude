@@ -1,6 +1,6 @@
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
@@ -13,6 +13,7 @@ use super::help::render_help;
 use super::markdown::render_markdown;
 use super::search_view::render_search_overlay;
 use super::stats_view::render_stats_dashboard;
+use super::theme::THEME;
 
 pub fn render(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
@@ -44,8 +45,8 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 
 fn render_panels(frame: &mut Frame, app: &mut App, area: Rect) {
     let border_color = match app.focus {
-        Focus::Panels => Color::Cyan,
-        _ => Color::DarkGray,
+        Focus::Panels => THEME.border_focused,
+        _ => THEME.border_unfocused,
     };
 
     // Show project name in the panel title
@@ -74,10 +75,10 @@ fn render_panels(frame: &mut Frame, app: &mut App, area: Rect) {
             };
             let style = if *panel == app.active_panel {
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(THEME.text_accent)
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(THEME.text_primary)
             };
             ListItem::new(label).style(style)
         })
@@ -88,12 +89,7 @@ fn render_panels(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let list = List::new(items)
         .block(block)
-        .highlight_style(
-            Style::default()
-                .bg(Color::DarkGray)
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        )
+        .highlight_style(THEME.highlight_style())
         .highlight_symbol(" > ");
 
     frame.render_stateful_widget(list, area, &mut list_state);
@@ -114,18 +110,18 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
             .unwrap_or("...");
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan))
+            .border_style(Style::default().fg(THEME.border_focused))
             .title(format!(" Loading {} ", source_label));
         let loading = Paragraph::new(vec![
             Line::from(""),
             Line::from(Span::styled(
                 "  Fetching from remote registry...",
-                Style::default().fg(Color::Yellow),
+                Style::default().fg(THEME.text_emphasis),
             )),
             Line::from(""),
             Line::from(Span::styled(
                 "  Please wait.",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(THEME.text_secondary),
             )),
         ])
         .block(block);
@@ -134,8 +130,8 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 
     let detail_border = match app.focus {
-        Focus::Detail => Color::Cyan,
-        _ => Color::DarkGray,
+        Focus::Detail => THEME.border_focused,
+        _ => THEME.border_unfocused,
     };
 
     let panel = app.active_panel;
@@ -145,7 +141,7 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(detail_border))
-            .title(Span::styled(" Stats ", Style::default().fg(Color::Cyan)));
+            .title(Span::styled(" Stats ", Style::default().fg(THEME.text_accent)));
         let inner = block.inner(area);
         frame.render_widget(block, area);
         render_stats_dashboard(frame, app, inner);
@@ -190,7 +186,7 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
         list_state.select(Some(app.panel_offset()));
 
         let list = List::new(items)
-            .highlight_style(highlight_style())
+            .highlight_style(THEME.highlight_style())
             .highlight_symbol(" > ");
         frame.render_stateful_widget(list, chunks[0], &mut list_state);
 
@@ -204,16 +200,16 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
 
         let preview_focused = app.focus == Focus::Preview;
         let preview_border_color = if preview_focused {
-            Color::Cyan
+            THEME.border_focused
         } else {
-            Color::DarkGray
+            THEME.border_unfocused
         };
         let preview_title_style = if preview_focused {
             Style::default()
-                .fg(Color::Cyan)
+                .fg(THEME.text_accent)
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(THEME.text_secondary)
         };
         let preview_title = if preview_focused {
             " Preview (j/k scroll) "
@@ -243,17 +239,10 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
         list_state.select(Some(app.panel_offset()));
 
         let list = List::new(items)
-            .highlight_style(highlight_style())
+            .highlight_style(THEME.highlight_style())
             .highlight_symbol(" > ");
         frame.render_stateful_widget(list, inner, &mut list_state);
     }
-}
-
-fn highlight_style() -> Style {
-    Style::default()
-        .bg(Color::DarkGray)
-        .fg(Color::White)
-        .add_modifier(Modifier::BOLD)
 }
 
 fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
@@ -272,18 +261,20 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let mut left_spans = vec![
         Span::styled(
             format!(" {} ", project_name),
-            Style::default().fg(Color::Black).bg(Color::Cyan),
+            Style::default()
+                .fg(THEME.status_bar_accent_fg)
+                .bg(THEME.status_bar_accent_bg),
         ),
         Span::styled(
             format!(" {} ", panel.label()),
-            Style::default().fg(Color::Cyan),
+            Style::default().fg(THEME.text_accent),
         ),
     ];
 
     if !app.filter.is_empty() {
         left_spans.push(Span::styled(
             format!(" /{} ", app.filter),
-            Style::default().fg(Color::Yellow),
+            Style::default().fg(THEME.text_emphasis),
         ));
     }
 
@@ -302,7 +293,10 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         Panel::Todos => "",
     };
 
-    let right_span = Span::styled(format!("{} ", hints), Style::default().fg(Color::DarkGray));
+    let right_span = Span::styled(
+        format!("{} ", hints),
+        Style::default().fg(THEME.text_secondary),
+    );
 
     // Render: left-aligned spans + right-aligned hints
     let left_line = Line::from(left_spans);
@@ -310,7 +304,7 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 
     // Render left part with background
     frame.render_widget(
-        Paragraph::new(left_line).style(Style::default().bg(Color::DarkGray)),
+        Paragraph::new(left_line).style(Style::default().bg(THEME.status_bar_bg)),
         area,
     );
 
@@ -324,7 +318,7 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             height: 1,
         };
         frame.render_widget(
-            Paragraph::new(right_line).style(Style::default().bg(Color::DarkGray)),
+            Paragraph::new(right_line).style(Style::default().bg(THEME.status_bar_bg)),
             right_area,
         );
     }

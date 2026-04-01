@@ -1,6 +1,6 @@
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
@@ -9,6 +9,7 @@ use ratatui::{
 use crate::app::SearchSource;
 
 use super::markdown::render_markdown;
+use super::theme::THEME;
 
 pub(crate) fn render_search_overlay(
     frame: &mut Frame,
@@ -31,16 +32,16 @@ pub(crate) fn render_search_overlay(
         overlay.filter.clone()
     };
     let filter_style = if overlay.filter.is_empty() {
-        Style::default().fg(Color::DarkGray)
+        Style::default().fg(THEME.text_secondary)
     } else {
-        Style::default().fg(Color::White)
+        Style::default().fg(THEME.text_primary)
     };
     let filter_block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan))
+        .border_style(Style::default().fg(THEME.border_focused))
         .title(format!(" Search {} ", source_label));
     let filter_paragraph = Paragraph::new(Line::from(vec![
-        Span::styled("  > ", Style::default().fg(Color::Cyan)),
+        Span::styled("  > ", Style::default().fg(THEME.text_accent)),
         Span::styled(filter_display, filter_style),
     ]))
     .block(filter_block);
@@ -59,9 +60,9 @@ pub(crate) fn render_search_overlay(
             let item = &overlay.all_items[i];
             let installed_marker = if item.installed { " \u{2714}" } else { "" };
             let name_color = if item.installed {
-                Color::DarkGray
+                THEME.text_secondary
             } else {
-                Color::Green
+                THEME.text_success
             };
             let mut spans = vec![
                 Span::styled("  ", Style::default()),
@@ -70,13 +71,13 @@ pub(crate) fn render_search_overlay(
             if !item.extra.is_empty() {
                 spans.push(Span::styled(
                     format!("  {}", item.extra),
-                    Style::default().fg(Color::Cyan),
+                    Style::default().fg(THEME.text_accent),
                 ));
             }
             if !installed_marker.is_empty() {
                 spans.push(Span::styled(
                     installed_marker.to_string(),
-                    Style::default().fg(Color::Yellow),
+                    Style::default().fg(THEME.text_emphasis),
                 ));
             }
             ListItem::new(Line::from(spans))
@@ -89,9 +90,9 @@ pub(crate) fn render_search_overlay(
     }
 
     let list_border = if !overlay.preview_focused {
-        Color::Cyan
+        THEME.border_focused
     } else {
-        Color::DarkGray
+        THEME.border_unfocused
     };
     let list = List::new(list_items)
         .block(
@@ -100,7 +101,7 @@ pub(crate) fn render_search_overlay(
                 .border_style(Style::default().fg(list_border))
                 .title(format!(" {} items ", filtered.len())),
         )
-        .highlight_style(highlight_style())
+        .highlight_style(THEME.highlight_style())
         .highlight_symbol(" > ");
     frame.render_stateful_widget(list, content_chunks[0], &mut list_state);
 
@@ -113,9 +114,9 @@ pub(crate) fn render_search_overlay(
         .unwrap_or("");
 
     let preview_border = if overlay.preview_focused {
-        Color::Cyan
+        THEME.border_focused
     } else {
-        Color::DarkGray
+        THEME.border_unfocused
     };
     let preview_title = if overlay.preview_focused {
         " Preview (j/k scroll) "
@@ -137,11 +138,4 @@ pub(crate) fn render_search_overlay(
         .wrap(Wrap { trim: false })
         .scroll((overlay.preview_scroll as u16, 0));
     frame.render_widget(paragraph, preview_inner);
-}
-
-fn highlight_style() -> Style {
-    Style::default()
-        .bg(Color::DarkGray)
-        .fg(Color::White)
-        .add_modifier(Modifier::BOLD)
 }
