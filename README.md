@@ -18,15 +18,6 @@ brew install idossha/lazyclaude/lazyclaude
 cargo install lazyclaude
 ```
 
-### Prebuilt binaries
-
-Download the latest release for your platform from [GitHub Releases](https://github.com/idossha/lazyclaude/releases/latest), then:
-
-```sh
-tar xzf lazyclaude-*.tar.gz
-sudo install lazyclaude-*/lazyclaude /usr/local/bin/
-```
-
 ### From source
 
 ```sh
@@ -55,36 +46,36 @@ Available sources for `list`: `memory`, `skills`, `commands`, `mcp`, `settings`,
 
 ## Navigation
 
-| Key | Action |
-|-----|--------|
-| `1-9, 0` | Switch panel directly |
-| `j/k` | Move up/down |
-| `J/K` | Scroll detail preview |
-| `Enter` | Select project / confirm action |
-| `l` | Focus detail pane |
-| `h/BS` | Back to panels |
-| `Tab` | Toggle panels/detail focus |
-| `/` | Filter items (fuzzy matching) |
-| `Esc` | Clear filter / back |
-| `?` | Help |
-| `R` | Refresh data |
-| `q` | Quit |
+| Key      | Action                          |
+| -------- | ------------------------------- |
+| `1-9, 0` | Switch panel directly           |
+| `j/k`    | Move up/down                    |
+| `J/K`    | Scroll detail preview           |
+| `Enter`  | Select project / confirm action |
+| `l`      | Focus detail pane               |
+| `h/BS`   | Back to panels                  |
+| `Tab`    | Toggle panels/detail focus      |
+| `/`      | Filter items (fuzzy matching)   |
+| `Esc`    | Clear filter / back             |
+| `?`      | Help                            |
+| `R`      | Refresh data                    |
+| `q`      | Quit                            |
 
 Mouse support: click to select panels/items, scroll wheel to navigate.
 
 ### Panel actions
 
-| Key | Action |
-|-----|--------|
+| Key | Action                                          |
+| --- | ----------------------------------------------- |
 | `e` | Edit in `$EDITOR` (Config/Memory/Skills/Agents) |
-| `a` | Add / create item (Settings/MCP/Skills/Agents) |
-| `d` | Delete item |
-| `u` | Undo last delete |
-| `D` | Deny selected permission (Settings) |
-| `t` | Toggle server (MCP) |
-| `s` | Search registry (Skills/MCP/Plugins) |
-| `y` | Copy to clipboard |
-| `x` | Export panel data as JSON to clipboard |
+| `a` | Add / create item (Settings/MCP/Skills/Agents)  |
+| `d` | Delete item                                     |
+| `u` | Undo last delete                                |
+| `D` | Deny selected permission (Settings)             |
+| `t` | Toggle server (MCP)                             |
+| `s` | Search registry (Skills/MCP/Plugins)            |
+| `y` | Copy to clipboard                               |
+| `x` | Export panel data as JSON to clipboard          |
 
 ### Search overlay
 
@@ -101,19 +92,19 @@ Skills are sourced from [anthropics/skills](https://github.com/anthropics/skills
 
 ## Panels
 
-| Key | Panel | Scope | Description |
-|-----|-------|-------|-------------|
-| `1` | Projects | -- | Switch active project context |
-| `2` | Config | User + Project | CLAUDE.md and rules (edit) |
-| `3` | Memory | Project | Memory files (edit/delete) |
-| `4` | Skills | User + Project | Skill definitions (create/search/install) |
-| `5` | Agents | User + Project | Agent definitions (create/edit) |
-| `6` | MCP | User + Project | Servers (add/remove/toggle/search) |
-| `7` | Settings | User/Project/Local | Permissions, hooks, keybindings (with diff view) |
-| `8` | Sessions | Project | Conversation history |
-| `9` | Stats | Global | Usage dashboard with charts |
-| `0` | Plugins | Global | Installed, blocked, marketplaces (search/install) |
-| -- | Todos | Global | Todo items from Claude sessions |
+| Key | Panel    | Scope              | Description                                       |
+| --- | -------- | ------------------ | ------------------------------------------------- |
+| `1` | Projects | --                 | Switch active project context                     |
+| `2` | Config   | User + Project     | CLAUDE.md and rules (edit)                        |
+| `3` | Memory   | Project            | Memory files (edit/delete)                        |
+| `4` | Skills   | User + Project     | Skill definitions (create/search/install)         |
+| `5` | Agents   | User + Project     | Agent definitions (create/edit)                   |
+| `6` | MCP      | User + Project     | Servers (add/remove/toggle/search)                |
+| `7` | Settings | User/Project/Local | Permissions, hooks, keybindings (with diff view)  |
+| `8` | Sessions | Project            | Conversation history                              |
+| `9` | Stats    | Global             | Usage dashboard with charts                       |
+| `0` | Plugins  | Global             | Installed, blocked, marketplaces (search/install) |
+| --  | Todos    | Global             | Todo items from Claude sessions                   |
 
 ## Features
 
@@ -209,25 +200,14 @@ Hooks are configured inside `settings.json` under the `hooks` key (not a separat
 
 ### Key Differences
 
-| Item | Format | Location |
-|------|--------|----------|
-| Skills | Subdirectory with `SKILL.md` | `.claude/skills/<name>/` |
-| Agents | Flat `.md` file | `.claude/agents/<name>.md` |
-| Commands | Flat `.md` file (legacy) | `.claude/commands/<name>.md` |
-| MCP | JSON with `mcpServers` key | `~/.mcp.json` or `.mcp.json` |
-| Hooks | JSON inside `settings.json` | `hooks` key in settings |
-| Memory | Auto-generated per project | `~/.claude/projects/<encoded>/memory/` |
-
-## Releasing
-
-Tag a version to trigger a release build:
-
-```sh
-git tag v0.x.y
-git push origin v0.x.y
-```
-
-GitHub Actions builds binaries for macOS (x86_64, aarch64) and Linux (x86_64, aarch64), publishes them as a GitHub Release, and automatically updates the [Homebrew formula](https://github.com/idossha/homebrew-lazyclaude).
+| Item     | Format                       | Location                               |
+| -------- | ---------------------------- | -------------------------------------- |
+| Skills   | Subdirectory with `SKILL.md` | `.claude/skills/<name>/`               |
+| Agents   | Flat `.md` file              | `.claude/agents/<name>.md`             |
+| Commands | Flat `.md` file (legacy)     | `.claude/commands/<name>.md`           |
+| MCP      | JSON with `mcpServers` key   | `~/.mcp.json` or `.mcp.json`           |
+| Hooks    | JSON inside `settings.json`  | `hooks` key in settings                |
+| Memory   | Auto-generated per project   | `~/.claude/projects/<encoded>/memory/` |
 
 ## License
 
